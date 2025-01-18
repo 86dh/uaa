@@ -2,6 +2,7 @@ package org.cloudfoundry.identity.uaa.metrics;
 
 import org.cloudfoundry.identity.uaa.util.JsonUtils;
 import org.cloudfoundry.identity.uaa.util.TimeService;
+import org.cloudfoundry.identity.uaa.util.UaaYamlUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -21,13 +22,13 @@ import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.stream.Collectors;
 
 @ManagedResource(
         objectName = "cloudfoundry.identity:name=ServerRequests",
@@ -47,8 +48,8 @@ public class UaaMetricsFilter extends OncePerRequestFilter implements UaaMetrics
     private final IdleTimer inflight;
     private final Map<String, MetricsQueue> perUriMetrics;
     private final LinkedHashMap<AntPathRequestMatcher, UrlGroup> urlGroups;
-    private final boolean enabled;
-    private final boolean perRequestMetrics;
+    private boolean enabled = true;
+    private boolean perRequestMetrics;
 
     private NotificationPublisher notificationPublisher;
 
@@ -99,6 +100,14 @@ public class UaaMetricsFilter extends OncePerRequestFilter implements UaaMetrics
         }
     }
 
+    public void setEnabled(boolean enabled) {
+        this.enabled = enabled;
+    }
+
+    public boolean isEnabled() {
+        return enabled;
+    }
+
     protected MetricsQueue getMetricsQueue(String uri) {
         if (!perUriMetrics.containsKey(uri)) {
             perUriMetrics.putIfAbsent(uri, new MetricsQueue());
@@ -115,7 +124,9 @@ public class UaaMetricsFilter extends OncePerRequestFilter implements UaaMetrics
             for (Map.Entry<AntPathRequestMatcher, UrlGroup> entry : urlGroups.entrySet()) {
                 if (entry.getKey().matches(request)) {
                     UrlGroup group = entry.getValue();
-                    logger.debug(String.format("Successfully matched URI: %s to a group: %s", uri, group.getGroup()));
+                    if (logger.isDebugEnabled()) {
+                        logger.debug("Successfully matched URI: %s to a group: %s".formatted(uri, group.getGroup()));
+                    }
                     return group;
                 }
             }
@@ -159,9 +170,11 @@ public class UaaMetricsFilter extends OncePerRequestFilter implements UaaMetrics
 
     public List<UrlGroup> getUrlGroups() throws IOException {
         ClassPathResource resource = new ClassPathResource("performance-url-groups.yml");
-        Yaml yaml = new Yaml();
-        List<Map<String, Object>> load = (List<Map<String, Object>>) yaml.load(resource.getInputStream());
-        return load.stream().map(map -> UrlGroup.from(map)).collect(Collectors.toList());
+        Yaml yaml = UaaYamlUtils.createYaml();
+        try (InputStream in = resource.getInputStream()) {
+            List<Map<String, Object>> load = yaml.load(in);
+            return load.stream().map(UrlGroup::from).toList();
+        }
     }
 
     public void sendRequestTime(String urlGroup, long time) {
@@ -176,5 +189,13 @@ public class UaaMetricsFilter extends OncePerRequestFilter implements UaaMetrics
     @Override
     public void setNotificationPublisher(final @NonNull NotificationPublisher notificationPublisher) {
         this.notificationPublisher = notificationPublisher;
+    }
+
+    public boolean isPerRequestMetrics() {
+        return perRequestMetrics;
+    }
+
+    public void setPerRequestMetrics(boolean perRequestMetrics) {
+        this.perRequestMetrics = perRequestMetrics;
     }
 }

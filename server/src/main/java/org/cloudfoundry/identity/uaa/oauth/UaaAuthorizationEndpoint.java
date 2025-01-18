@@ -3,9 +3,25 @@ package org.cloudfoundry.identity.uaa.oauth;
 import org.apache.http.HttpHost;
 import org.apache.http.client.utils.URIUtils;
 import org.cloudfoundry.identity.uaa.authentication.UaaPrincipal;
+import org.cloudfoundry.identity.uaa.provider.ClientRegistrationException;
+import org.cloudfoundry.identity.uaa.provider.NoSuchClientException;
 import org.cloudfoundry.identity.uaa.oauth.client.ClientConstants;
+import org.cloudfoundry.identity.uaa.oauth.common.OAuth2AccessToken;
+import org.cloudfoundry.identity.uaa.oauth.common.util.OAuth2Utils;
 import org.cloudfoundry.identity.uaa.oauth.pkce.PkceValidationService;
+import org.cloudfoundry.identity.uaa.oauth.provider.AuthorizationRequest;
+import org.cloudfoundry.identity.uaa.oauth.provider.OAuth2Authentication;
+import org.cloudfoundry.identity.uaa.oauth.provider.OAuth2Request;
+import org.cloudfoundry.identity.uaa.oauth.provider.OAuth2RequestFactory;
+import org.cloudfoundry.identity.uaa.oauth.provider.OAuth2RequestValidator;
+import org.cloudfoundry.identity.uaa.oauth.provider.TokenGranter;
+import org.cloudfoundry.identity.uaa.oauth.provider.TokenRequest;
+import org.cloudfoundry.identity.uaa.oauth.provider.approval.UserApprovalHandler;
+import org.cloudfoundry.identity.uaa.oauth.provider.code.AuthorizationCodeServices;
+import org.cloudfoundry.identity.uaa.oauth.provider.implicit.ImplicitGrantService;
+import org.cloudfoundry.identity.uaa.oauth.provider.implicit.ImplicitTokenRequest;
 import org.cloudfoundry.identity.uaa.oauth.token.CompositeToken;
+import org.cloudfoundry.identity.uaa.oauth.provider.endpoint.AbstractEndpoint;
 import org.cloudfoundry.identity.uaa.util.UaaHttpRequestUtils;
 import org.cloudfoundry.identity.uaa.zone.IdentityZoneHolder;
 import org.cloudfoundry.identity.uaa.zone.MultitenantClientServices;
@@ -17,34 +33,19 @@ import org.springframework.security.authentication.InsufficientAuthenticationExc
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.GrantedAuthority;
-import org.springframework.security.oauth2.common.OAuth2AccessToken;
-import org.springframework.security.oauth2.common.exceptions.BadClientCredentialsException;
-import org.springframework.security.oauth2.common.exceptions.ClientAuthenticationException;
-import org.springframework.security.oauth2.common.exceptions.InvalidClientException;
-import org.springframework.security.oauth2.common.exceptions.InvalidRequestException;
-import org.springframework.security.oauth2.common.exceptions.InvalidScopeException;
-import org.springframework.security.oauth2.common.exceptions.OAuth2Exception;
-import org.springframework.security.oauth2.common.exceptions.RedirectMismatchException;
-import org.springframework.security.oauth2.common.exceptions.UnapprovedClientAuthenticationException;
-import org.springframework.security.oauth2.common.exceptions.UnauthorizedClientException;
-import org.springframework.security.oauth2.common.exceptions.UnsupportedResponseTypeException;
-import org.springframework.security.oauth2.common.exceptions.UserDeniedAuthorizationException;
-import org.springframework.security.oauth2.common.util.OAuth2Utils;
-import org.springframework.security.oauth2.provider.AuthorizationRequest;
-import org.springframework.security.oauth2.provider.ClientDetails;
-import org.springframework.security.oauth2.provider.ClientRegistrationException;
-import org.springframework.security.oauth2.provider.NoSuchClientException;
-import org.springframework.security.oauth2.provider.OAuth2Authentication;
-import org.springframework.security.oauth2.provider.OAuth2Request;
-import org.springframework.security.oauth2.provider.OAuth2RequestFactory;
-import org.springframework.security.oauth2.provider.OAuth2RequestValidator;
-import org.springframework.security.oauth2.provider.TokenGranter;
-import org.springframework.security.oauth2.provider.TokenRequest;
-import org.springframework.security.oauth2.provider.approval.UserApprovalHandler;
-import org.springframework.security.oauth2.provider.code.AuthorizationCodeServices;
-import org.springframework.security.oauth2.provider.endpoint.AbstractEndpoint;
-import org.springframework.security.oauth2.provider.endpoint.RedirectResolver;
-import org.springframework.security.oauth2.provider.implicit.ImplicitTokenRequest;
+import org.cloudfoundry.identity.uaa.oauth.common.exceptions.BadClientCredentialsException;
+import org.cloudfoundry.identity.uaa.oauth.common.exceptions.ClientAuthenticationException;
+import org.cloudfoundry.identity.uaa.oauth.common.exceptions.InvalidClientException;
+import org.cloudfoundry.identity.uaa.oauth.common.exceptions.InvalidRequestException;
+import org.cloudfoundry.identity.uaa.oauth.common.exceptions.InvalidScopeException;
+import org.cloudfoundry.identity.uaa.oauth.common.exceptions.OAuth2Exception;
+import org.cloudfoundry.identity.uaa.oauth.common.exceptions.RedirectMismatchException;
+import org.cloudfoundry.identity.uaa.oauth.common.exceptions.UnapprovedClientAuthenticationException;
+import org.cloudfoundry.identity.uaa.oauth.common.exceptions.UnauthorizedClientException;
+import org.cloudfoundry.identity.uaa.oauth.common.exceptions.UnsupportedResponseTypeException;
+import org.cloudfoundry.identity.uaa.oauth.common.exceptions.UserDeniedAuthorizationException;
+import org.cloudfoundry.identity.uaa.oauth.provider.ClientDetails;
+import org.cloudfoundry.identity.uaa.oauth.provider.endpoint.RedirectResolver;
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.util.UrlUtils;
 import org.springframework.stereotype.Controller;
@@ -80,7 +81,7 @@ import java.util.Map;
 import java.util.Set;
 
 import static java.util.Arrays.stream;
-import static java.util.Collections.EMPTY_SET;
+import static java.util.Collections.emptySet;
 import static java.util.Optional.ofNullable;
 import static org.cloudfoundry.identity.uaa.oauth.token.ClaimConstants.GRANT_TYPE;
 import static org.cloudfoundry.identity.uaa.oauth.token.TokenConstants.GRANT_TYPE_AUTHORIZATION_CODE;
@@ -88,7 +89,7 @@ import static org.cloudfoundry.identity.uaa.oauth.token.TokenConstants.GRANT_TYP
 import static org.cloudfoundry.identity.uaa.util.JsonUtils.hasText;
 import static org.cloudfoundry.identity.uaa.util.UaaUrlUtils.addFragmentComponent;
 import static org.cloudfoundry.identity.uaa.util.UaaUrlUtils.addQueryParameter;
-import static org.springframework.security.oauth2.common.util.OAuth2Utils.SCOPE_PREFIX;
+import static org.cloudfoundry.identity.uaa.oauth.common.util.OAuth2Utils.SCOPE_PREFIX;
 
 /**
  * Authorization endpoint that returns id_token's if requested.
@@ -112,8 +113,8 @@ public class UaaAuthorizationEndpoint extends AbstractEndpoint implements Authen
     private static final List<String> supported_response_types = Arrays.asList("code", "token", "id_token");
 
     private final RedirectResolver redirectResolver;
-    private final UserApprovalHandler userApprovalHandler;
-    private final OAuth2RequestValidator oauth2RequestValidator;
+    private UserApprovalHandler userApprovalHandler;
+    private OAuth2RequestValidator oauth2RequestValidator;
     private final AuthorizationCodeServices authorizationCodeServices;
     private final HybridTokenGranterForAuthorizationCode hybridTokenGranterForAuthCode;
     private final OpenIdSessionStateCalculator openIdSessionStateCalculator;
@@ -154,10 +155,10 @@ public class UaaAuthorizationEndpoint extends AbstractEndpoint implements Authen
 
     @RequestMapping(value = "/oauth/authorize")
     public ModelAndView authorize(Map<String, Object> model,
-                                  @RequestParam Map<String, String> parameters,
-                                  SessionStatus sessionStatus,
-                                  Principal principal,
-                                  HttpServletRequest request) {
+            @RequestParam Map<String, String> parameters,
+            SessionStatus sessionStatus,
+            Principal principal,
+            HttpServletRequest request) {
 
         ClientDetails client;
         String clientId;
@@ -182,13 +183,13 @@ public class UaaAuthorizationEndpoint extends AbstractEndpoint implements Authen
         String grantType = deriveGrantTypeFromResponseType(responseTypes);
 
         if (!supported_response_types.containsAll(responseTypes)) {
-            throw new UnsupportedResponseTypeException("Unsupported response types: " + responseTypes);
+            throw new UnsupportedResponseTypeException("Unsupported response types");
         }
 
         if (authorizationRequest.getClientId() == null) {
             throw new InvalidClientException("A client id must be provided");
         }
-        
+
         validateAuthorizationRequestPkceParameters(authorizationRequest.getRequestParameters());
 
         String resolvedRedirect = "";
@@ -205,14 +206,14 @@ public class UaaAuthorizationEndpoint extends AbstractEndpoint implements Authen
                         "A redirectUri must be either supplied or preconfigured in the ClientDetails");
             }
 
-            boolean isAuthenticated = (principal instanceof Authentication) && ((Authentication) principal).isAuthenticated();
+            boolean isAuthenticated = (principal instanceof Authentication a) && a.isAuthenticated();
 
             if (!isAuthenticated) {
                 throw new InsufficientAuthenticationException(
                         "User must be authenticated with Spring Security before authorization can be completed.");
             }
 
-            if (!(responseTypes.size() > 0)) {
+            if (responseTypes.size() <= 0) {
                 return new ModelAndView(new RedirectView(addQueryParameter(addQueryParameter(resolvedRedirect, "error", "invalid_request"), "error_description", "Missing response_type in authorization request")));
             }
 
@@ -274,7 +275,7 @@ public class UaaAuthorizationEndpoint extends AbstractEndpoint implements Authen
         }
 
     }
-    
+
     /**
      * PKCE parameters check: 
      *      code_challenge: (Optional) Must be provided for PKCE and must not be empty.
@@ -284,9 +285,9 @@ public class UaaAuthorizationEndpoint extends AbstractEndpoint implements Authen
      */
     protected void validateAuthorizationRequestPkceParameters(Map<String, String> authorizationRequestParameters) {
         if (pkceValidationService != null) {
-    	    String codeChallenge = authorizationRequestParameters.get(PkceValidationService.CODE_CHALLENGE);
+            String codeChallenge = authorizationRequestParameters.get(PkceValidationService.CODE_CHALLENGE);
             if (codeChallenge != null) {
-                if(!PkceValidationService.isCodeChallengeParameterValid(codeChallenge)) {
+                if (!PkceValidationService.isCodeChallengeParameterValid(codeChallenge)) {
                     throw new InvalidRequestException("Code challenge length must between 43 and 128 and use only [A-Z],[a-z],[0-9],_,.,-,~ characters.");
                 }
                 String codeChallengeMethod = authorizationRequestParameters.get(PkceValidationService.CODE_CHALLENGE_METHOD);
@@ -295,10 +296,10 @@ public class UaaAuthorizationEndpoint extends AbstractEndpoint implements Authen
                 }
                 if (!pkceValidationService.isCodeChallengeMethodSupported(codeChallengeMethod)) {
                     throw new InvalidRequestException("Unsupported code challenge method. Supported: " +
-                        pkceValidationService.getSupportedCodeChallengeMethods().toString());
+                            pkceValidationService.getSupportedCodeChallengeMethods().toString());
                 }
             }
-        }   
+        }
     }
 
     // This method handles /oauth/authorize calls when user is not logged in and the prompt=none param is used
@@ -317,10 +318,10 @@ public class UaaAuthorizationEndpoint extends AbstractEndpoint implements Authen
             return;
         }
 
-        Set<String> redirectUris = ofNullable(client.getRegisteredRedirectUri()).orElse(EMPTY_SET);
+        Set<String> redirectUris = ofNullable(client.getRegisteredRedirectUri()).orElse(emptySet());
 
         //if the client doesn't have a redirect uri set, the parameter is required.
-        if (redirectUris.size() == 0 && !hasText(redirectUri)) {
+        if (redirectUris.isEmpty() && !hasText(redirectUri)) {
             logger.debug("[prompt=none] Missing redirect_uri");
             response.setStatus(HttpStatus.BAD_REQUEST.value());
             return;
@@ -354,7 +355,7 @@ public class UaaAuthorizationEndpoint extends AbstractEndpoint implements Authen
     private ModelAndView switchIdp(Map<String, Object> model, ClientDetails client, String clientId, HttpServletRequest request) {
         Map<String, Object> additionalInfo = client.getAdditionalInformation();
         String clientDisplayName = (String) additionalInfo.get(ClientConstants.CLIENT_NAME);
-        model.put("client_display_name", (clientDisplayName != null) ? clientDisplayName : clientId);
+        model.put("client_display_name", clientDisplayName != null ? clientDisplayName : clientId);
 
         String queryString = UaaHttpRequestUtils.paramsToQueryString(request.getParameterMap());
         String redirectUri = request.getRequestURL() + "?" + queryString;
@@ -398,7 +399,7 @@ public class UaaAuthorizationEndpoint extends AbstractEndpoint implements Authen
 
     @RequestMapping(value = "/oauth/authorize", method = RequestMethod.POST, params = OAuth2Utils.USER_OAUTH_APPROVAL)
     public View approveOrDeny(@RequestParam Map<String, String> approvalParameters, Map<String, ?> model,
-                              SessionStatus sessionStatus, Principal principal) {
+            SessionStatus sessionStatus, Principal principal) {
 
         if (!(principal instanceof Authentication)) {
             sessionStatus.setComplete();
@@ -524,7 +525,7 @@ public class UaaAuthorizationEndpoint extends AbstractEndpoint implements Authen
 
     // We need explicit approval from the user.
     private ModelAndView getUserApprovalPageResponse(Map<String, Object> model,
-                                                     AuthorizationRequest authorizationRequest, Authentication principal) {
+            AuthorizationRequest authorizationRequest, Authentication principal) {
         logger.debug("Loading user approval page: " + userApprovalPage);
         model.putAll(userApprovalHandler.getUserApprovalRequest(authorizationRequest, principal));
         return new ModelAndView(userApprovalPage, model);
@@ -562,8 +563,8 @@ public class UaaAuthorizationEndpoint extends AbstractEndpoint implements Authen
     }
 
     private OAuth2AccessToken getAccessTokenForImplicitGrantOrHybrid(TokenRequest tokenRequest,
-                                                                     OAuth2Request storedOAuth2Request,
-                                                                     String grantType
+            OAuth2Request storedOAuth2Request,
+            String grantType
     ) throws OAuth2Exception {
         // These 1 method calls have to be atomic, otherwise the ImplicitGrantService can have a race condition where
         // one thread removes the token request before another has a chance to redeem it.
@@ -601,8 +602,8 @@ public class UaaAuthorizationEndpoint extends AbstractEndpoint implements Authen
     }
 
     public String buildRedirectURI(AuthorizationRequest authorizationRequest,
-                                   OAuth2AccessToken accessToken,
-                                   Authentication authUser) {
+            OAuth2AccessToken accessToken,
+            Authentication authUser) {
 
         String requestedRedirect = authorizationRequest.getRedirectUri();
         if (accessToken == null) {
@@ -618,9 +619,9 @@ public class UaaAuthorizationEndpoint extends AbstractEndpoint implements Authen
             url.append("&access_token=").append(encode(accessToken.getValue()));
         }
 
-        if (accessToken instanceof CompositeToken &&
+        if (accessToken instanceof CompositeToken token &&
                 authorizationRequest.getResponseTypes().contains(CompositeToken.ID_TOKEN)) {
-            url.append("&").append(CompositeToken.ID_TOKEN).append("=").append(encode(((CompositeToken) accessToken).getIdTokenValue()));
+            url.append("&").append(CompositeToken.ID_TOKEN).append("=").append(encode(token.getIdTokenValue()));
         }
 
         if (authorizationRequest.getResponseTypes().contains("code")) {
@@ -635,8 +636,8 @@ public class UaaAuthorizationEndpoint extends AbstractEndpoint implements Authen
 
         Date expiration = accessToken.getExpiration();
         if (expiration != null) {
-            long expires_in = (expiration.getTime() - System.currentTimeMillis()) / 1000;
-            url.append("&expires_in=").append(expires_in);
+            long expiresIn = (expiration.getTime() - System.currentTimeMillis()) / 1000;
+            url.append("&expires_in=").append(expiresIn);
         }
 
         String originalScope = authorizationRequest.getRequestParameters().get(OAuth2Utils.SCOPE);
@@ -717,7 +718,7 @@ public class UaaAuthorizationEndpoint extends AbstractEndpoint implements Authen
     }
 
     private String getUnsuccessfulRedirect(AuthorizationRequest authorizationRequest, OAuth2Exception failure,
-                                           boolean fragment) {
+            boolean fragment) {
 
         if (authorizationRequest == null || authorizationRequest.getRedirectUri() == null) {
             // we have no redirect for the user. very sad.
@@ -751,7 +752,7 @@ public class UaaAuthorizationEndpoint extends AbstractEndpoint implements Authen
     }
 
     @SuppressWarnings("deprecation")
-    public void setImplicitGrantService(org.springframework.security.oauth2.provider.implicit.ImplicitGrantService implicitGrantService) {
+    public void setImplicitGrantService(ImplicitGrantService implicitGrantService) {
     }
 
     @ExceptionHandler(ClientRegistrationException.class)
@@ -777,7 +778,9 @@ public class UaaAuthorizationEndpoint extends AbstractEndpoint implements Authen
     private ModelAndView handleException(Exception e, ServletWebRequest webRequest) throws Exception {
 
         ResponseEntity<OAuth2Exception> translate = getExceptionTranslator().translate(e);
-        webRequest.getResponse().setStatus(translate.getStatusCode().value());
+        if (webRequest.getResponse() != null) {
+            webRequest.getResponse().setStatus(translate.getStatusCode().value());
+        }
 
         if (e instanceof ClientAuthenticationException || e instanceof RedirectMismatchException) {
             Map<String, Object> map = new HashMap<>();
@@ -817,7 +820,7 @@ public class UaaAuthorizationEndpoint extends AbstractEndpoint implements Authen
             return authorizationRequest;
         }
 
-        Map<String, String> parameters = new HashMap<String, String>();
+        Map<String, String> parameters = new HashMap<>();
         Map<String, String[]> map = webRequest.getParameterMap();
         for (String key : map.keySet()) {
             String[] values = map.get(key);
@@ -837,5 +840,13 @@ public class UaaAuthorizationEndpoint extends AbstractEndpoint implements Authen
     private ClientDetails loadClientByClientId(String clientId) {
         return ((MultitenantClientServices) super.getClientDetailsService())
                 .loadClientByClientId(clientId, IdentityZoneHolder.get().getId());
+    }
+
+    public void setOAuth2RequestValidator(OAuth2RequestValidator oauth2RequestValidator) {
+        this.oauth2RequestValidator = oauth2RequestValidator;
+    }
+
+    public void setUserApprovalHandler(UserApprovalHandler userApprovalHandler) {
+        this.userApprovalHandler = userApprovalHandler;
     }
 }

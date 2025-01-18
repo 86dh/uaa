@@ -1,4 +1,5 @@
-/*******************************************************************************
+/*
+ * *****************************************************************************
  *     Cloud Foundry
  *     Copyright (c) [2009-2016] Pivotal Software, Inc. All Rights Reserved.
  *
@@ -11,6 +12,12 @@
  *     subcomponent's license, as noted in the LICENSE file.
  *******************************************************************************/
 package org.cloudfoundry.identity.uaa.authentication.manager;
+
+import java.io.IOException;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+import java.util.function.UnaryOperator;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import org.cloudfoundry.identity.uaa.login.AutologinRequest;
@@ -27,24 +34,22 @@ import org.springframework.http.converter.HttpMessageNotWritableException;
 import org.springframework.http.converter.StringHttpMessageConverter;
 import org.springframework.util.MultiValueMap;
 
-import java.io.IOException;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
-
 public class AutologinRequestConverter extends AbstractHttpMessageConverter<AutologinRequest> {
+    private static final String USERNAME = "username";
+    private static final String PASSWORD = "password";
 
-    private FormHttpMessageConverter formConverter = new FormHttpMessageConverter();
-    private StringHttpMessageConverter stringConverter = new StringHttpMessageConverter();
+    private final FormHttpMessageConverter formConverter = new FormHttpMessageConverter();
+    private final StringHttpMessageConverter stringConverter = new StringHttpMessageConverter();
 
     public AutologinRequestConverter() {
         setSupportedMediaTypes(Arrays.asList(
-            MediaType.APPLICATION_FORM_URLENCODED,
-            MediaType.APPLICATION_JSON)
+                MediaType.APPLICATION_FORM_URLENCODED,
+                MediaType.APPLICATION_JSON)
         );
     }
 
     @Override
+    @SuppressWarnings("NullableProblems")
     protected boolean supports(Class<?> clazz) {
         return AutologinRequest.class.isAssignableFrom(clazz);
     }
@@ -52,7 +57,7 @@ public class AutologinRequestConverter extends AbstractHttpMessageConverter<Auto
     public boolean isJsonContent(List<String> contentType) {
         if (contentType != null) {
             for (String s : contentType) {
-                if (s!=null && s.contains(MediaType.APPLICATION_JSON_VALUE)) {
+                if (s != null && s.contains(MediaType.APPLICATION_JSON_VALUE)) {
                     return true;
                 }
             }
@@ -61,35 +66,40 @@ public class AutologinRequestConverter extends AbstractHttpMessageConverter<Auto
     }
 
     @Override
+    @SuppressWarnings({"NullableProblems", "Convert2Diamond"})
     protected AutologinRequest readInternal(Class<? extends AutologinRequest> clazz, HttpInputMessage inputMessage)
-                    throws IOException, HttpMessageNotReadableException {
+            throws IOException, HttpMessageNotReadableException {
 
-        String username, password;
+        AutologinRequest result = new AutologinRequest();
+
+        UnaryOperator<String> getValue;
         if (isJsonContent(inputMessage.getHeaders().get(HttpHeaders.CONTENT_TYPE))) {
             Map<String, String> map = JsonUtils.readValue(stringConverter.read(String.class, inputMessage),
-                                                          new TypeReference<Map<String, String>>() {});
-            username = map.get("username");
-            password = map.get("password");
+                    new TypeReference<Map<String, String>>() {
+                    });
+            if (map == null) {
+                return result;
+            }
+            getValue = map::get;
         } else {
             MultiValueMap<String, String> map = formConverter.read(null, inputMessage);
-            username = map.getFirst("username");
-            password = map.getFirst("password");
+            getValue = map::getFirst;
         }
-        AutologinRequest result = new AutologinRequest();
-        result.setUsername(username);
-        result.setPassword(password);
+        result.setUsername(getValue.apply(USERNAME));
+        result.setPassword(getValue.apply(PASSWORD));
         return result;
     }
 
     @Override
+    @SuppressWarnings("NullableProblems")
     protected void writeInternal(AutologinRequest t, HttpOutputMessage outputMessage) throws IOException,
-                    HttpMessageNotWritableException {
-        MultiValueMap<String, String> map = new LinkedMaskingMultiValueMap<String, String>("password");
+            HttpMessageNotWritableException {
+        MultiValueMap<String, String> map = new LinkedMaskingMultiValueMap<>(PASSWORD);
         if (t.getUsername() != null) {
-            map.set("username", t.getUsername());
+            map.set(USERNAME, t.getUsername());
         }
         if (t.getPassword() != null) {
-            map.set("password", t.getPassword());
+            map.set(PASSWORD, t.getPassword());
         }
         formConverter.write(map, MediaType.APPLICATION_FORM_URLENCODED, outputMessage);
     }

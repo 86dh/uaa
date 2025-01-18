@@ -1,4 +1,5 @@
-/*******************************************************************************
+/*
+ * *****************************************************************************
  *     Cloud Foundry
  *     Copyright (c) [2009-2016] Pivotal Software, Inc. All Rights Reserved.
  *
@@ -33,6 +34,7 @@ import javax.validation.constraints.NotNull;
 import javax.validation.constraints.Pattern;
 import java.io.BufferedReader;
 import java.io.FileReader;
+import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -76,28 +78,28 @@ public class UaaConfiguration {
     @Valid
     public CloudController cloud_controller;
     @Valid
-    public Map<String,Object> ldap;
+    public Map<String, Object> ldap;
 
     @Valid
-    public Map<String,Object> login;
+    public Map<String, Object> login;
     @Valid
-    public Map<String,Object> logout;
+    public Map<String, Object> logout;
     @Valid
-    public Map<String,Object> links;
+    public Map<String, Object> links;
     @Valid
-    public Map<String,Object> smtp;
+    public Map<String, Object> smtp;
     @Valid
-    public Map<String,Object> tiles;
+    public Map<String, Object> tiles;
     @Valid
-    public Map<String,Object> servlet;
+    public Map<String, Object> servlet;
     @Valid
-    public Map<String,Object> password;
+    public Map<String, Object> password;
     @Valid
-    public Map<String,Object> authentication;
+    public Map<String, Object> authentication;
     @Valid
-    public Map<String,Object> notifications;
+    public Map<String, Object> notifications;
     @Valid
-    public Map<String,Object> uaa;
+    public Map<String, Object> uaa;
     @Valid
     public String assetBaseUrl;
     @Valid
@@ -105,7 +107,7 @@ public class UaaConfiguration {
     @Valid
     public OAuth multitenant;
     @Valid
-    public Map<String,Object> cors;
+    public Map<String, Object> cors;
 
     public static class Zones {
         @Valid
@@ -153,18 +155,22 @@ public class UaaConfiguration {
             @NotNull(message = "'token:' requires 'signing-key'")
             public String signingKey;
             public String verificationKey;
+            public String signingCert;
+            public String signingAlg;
             public Claims claims;
             public Policy policy;
+
             public static class Claims {
                 public Set<String> exclusions;
             }
 
             public static class Policy {
                 public String activeKeyId;
-                public Map<String,KeySpec> keys;
+                public Map<String, KeySpec> keys;
                 public Policy global;
                 public int accessTokenValiditySeconds;
                 public int refreshTokenValiditySeconds;
+
                 public static class KeySpec {
                     public String signingKey;
                     public String signingKeyPassword;
@@ -188,6 +194,7 @@ public class UaaConfiguration {
         public static class Client {
             public String override;
             public List<String> autoapprove;
+            public List<String> allowpublic;
         }
 
         public static class Authorize {
@@ -210,6 +217,7 @@ public class UaaConfiguration {
         public String id;
         public boolean override;
         public List<String> autoapprove;
+        public List<String> allowpublic;
         public String scope;
         public String secret;
         public String authorities;
@@ -225,7 +233,6 @@ public class UaaConfiguration {
         public boolean userids_enabled;
         public boolean userOverride;
         public List<String> users;
-        public String username_pattern;
         public Object groups;
     }
 
@@ -264,6 +271,8 @@ public class UaaConfiguration {
             addPropertyAlias("password-policy", UaaConfiguration.class, "passwordPolicy");
             addPropertyAlias("required-score", PasswordPolicy.class, "requiredScore");
             addPropertyAlias("signing-key", Jwt.Token.class, "signingKey");
+            addPropertyAlias("signing-alg", Jwt.Token.class, "signingAlg");
+            addPropertyAlias("signing-cert", Jwt.Token.class, "signingCert");
             addPropertyAlias("verification-key", Jwt.Token.class, "verificationKey");
             addPropertyAlias("exclude", Jwt.Token.Claims.class, "exclusions");
             addPropertyAlias("authorized-grant-types", OAuthClient.class, "grantTypes");
@@ -292,11 +301,13 @@ public class UaaConfiguration {
             throw new IllegalArgumentException("YAML file required");
         }
         Yaml yaml = new Yaml(new UaaConfigConstructor());
-        BufferedReader br = new BufferedReader(new FileReader(args[0]));
-        UaaConfiguration config = (UaaConfiguration) yaml.load(br);
-        ValidatorFactory factory = Validation.buildDefaultValidatorFactory();
-        Validator validator = factory.getValidator();
-        Set<ConstraintViolation<UaaConfiguration>> errors = validator.validate(config);
-        System.out.println(errors);
+        try (InputStreamReader inputStreamReader = new FileReader(args[0])) {
+            BufferedReader br = new BufferedReader(inputStreamReader);
+            UaaConfiguration config = (UaaConfiguration) yaml.load(br);
+            ValidatorFactory factory = Validation.buildDefaultValidatorFactory();
+            Validator validator = factory.getValidator();
+            Set<ConstraintViolation<UaaConfiguration>> errors = validator.validate(config);
+            System.out.println(errors);
+        }
     }
 }

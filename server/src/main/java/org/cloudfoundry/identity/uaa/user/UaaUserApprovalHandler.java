@@ -1,16 +1,21 @@
 package org.cloudfoundry.identity.uaa.user;
 
+import org.cloudfoundry.identity.uaa.client.UaaClientDetails;
+import org.cloudfoundry.identity.uaa.oauth.common.OAuth2AccessToken;
+import org.cloudfoundry.identity.uaa.oauth.common.util.OAuth2Utils;
+import org.cloudfoundry.identity.uaa.oauth.provider.AuthorizationRequest;
+import org.cloudfoundry.identity.uaa.oauth.provider.OAuth2Authentication;
+import org.cloudfoundry.identity.uaa.oauth.provider.OAuth2Request;
+import org.cloudfoundry.identity.uaa.oauth.provider.OAuth2RequestFactory;
+import org.cloudfoundry.identity.uaa.oauth.provider.approval.UserApprovalHandler;
+import org.cloudfoundry.identity.uaa.oauth.provider.token.AuthorizationServerTokenServices;
+import org.cloudfoundry.identity.uaa.provider.ClientRegistrationException;
 import org.cloudfoundry.identity.uaa.zone.MultitenantClientServices;
 import org.cloudfoundry.identity.uaa.zone.beans.IdentityZoneManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.oauth2.common.OAuth2AccessToken;
-import org.springframework.security.oauth2.common.util.OAuth2Utils;
-import org.springframework.security.oauth2.provider.*;
-import org.springframework.security.oauth2.provider.approval.UserApprovalHandler;
-import org.springframework.security.oauth2.provider.client.BaseClientDetails;
-import org.springframework.security.oauth2.provider.token.AuthorizationServerTokenServices;
+import org.cloudfoundry.identity.uaa.oauth.provider.ClientDetails;
 
 import java.util.Collection;
 import java.util.HashMap;
@@ -62,7 +67,7 @@ public class UaaUserApprovalHandler implements UserApprovalHandler {
     }
 
     private boolean isAutoApprove(ClientDetails client, Collection<String> scopes) {
-        BaseClientDetails baseClient = (BaseClientDetails) client;
+        UaaClientDetails baseClient = (UaaClientDetails) client;
 
         if (baseClient.getAutoApproveScopes() == null) {
             return false;
@@ -101,7 +106,7 @@ public class UaaUserApprovalHandler implements UserApprovalHandler {
 
         OAuth2Authentication authentication = new OAuth2Authentication(storedOAuth2Request, userAuthentication);
         if (logger.isDebugEnabled()) {
-            final String logMessage = String.format("Looking up existing token for client_id=%s, scope=%s and username=%s",
+            final String logMessage = "Looking up existing token for client_id=%s, scope=%s and username=%s".formatted(
                     clientId,
                     scopes,
                     userAuthentication.getName());
@@ -128,14 +133,14 @@ public class UaaUserApprovalHandler implements UserApprovalHandler {
     public AuthorizationRequest updateAfterApproval(AuthorizationRequest authorizationRequest, Authentication userAuthentication) {
         Map<String, String> approvalParameters = authorizationRequest.getApprovalParameters();
         String flag = approvalParameters.get(OAuth2Utils.USER_OAUTH_APPROVAL);
-        boolean approved = flag != null && flag.toLowerCase().equals("true");
+        boolean approved = flag != null && "true".equals(flag.toLowerCase());
         authorizationRequest.setApproved(approved);
         return authorizationRequest;
     }
 
     @Override
     public Map<String, Object> getUserApprovalRequest(AuthorizationRequest authorizationRequest,
-                                                      Authentication userAuthentication) {
+            Authentication userAuthentication) {
         // In case of a redirect we might want the request parameters to be included
         return new HashMap<>(authorizationRequest.getRequestParameters());
     }

@@ -1,16 +1,16 @@
 package org.cloudfoundry.identity.uaa.security;
 
-import org.apache.directory.api.util.Strings;
 import org.cloudfoundry.identity.uaa.constants.OriginKeys;
 import org.cloudfoundry.identity.uaa.scim.ScimUser;
 import org.cloudfoundry.identity.uaa.scim.ScimUserProvisioning;
 import org.cloudfoundry.identity.uaa.scim.exception.ScimResourceNotFoundException;
+import org.cloudfoundry.identity.uaa.util.UaaStringUtils;
 import org.cloudfoundry.identity.uaa.zone.IdentityZoneHolder;
 
 import java.util.Objects;
 
 public class ScimUserUpdateDiff {
-    private ScimUserProvisioning scimUserProvisioning;
+    private final ScimUserProvisioning scimUserProvisioning;
 
     public ScimUserUpdateDiff(ScimUserProvisioning scimUserProvisioning) {
         this.scimUserProvisioning = scimUserProvisioning;
@@ -40,7 +40,7 @@ public class ScimUserUpdateDiff {
 
     private boolean originsEquivalent(ScimUser scimUserFromRequest, ScimUser scimUserFromDb) {
         return scimUserFromDb.getOrigin().equals(scimUserFromRequest.getOrigin()) ||
-                (scimUserFromDb.getOrigin().equals(OriginKeys.UAA) && Strings.isEmpty(scimUserFromRequest.getOrigin()));
+                (scimUserFromDb.getOrigin().equals(OriginKeys.UAA) && UaaStringUtils.isNullOrEmpty(scimUserFromRequest.getOrigin()));
     }
 
     private boolean phoneNumbersEquivalent(ScimUser scimUserFromRequest, ScimUser scimUserFromDb) {

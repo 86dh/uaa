@@ -2,7 +2,8 @@ package org.cloudfoundry.identity.uaa.metrics;
 
 import org.junit.jupiter.api.Test;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.within;
 
 class MetricsUtilTest {
 
@@ -14,13 +15,13 @@ class MetricsUtilTest {
         double avergeCount = 1.0;
 
         double newAverage = MetricsUtil.addToAverage(avergeCount, average, 1.0, 1.0);
-        assertEquals(1.0, newAverage, DELTA);
+        assertThat(newAverage).isCloseTo(1.0, within(DELTA));
 
         newAverage = MetricsUtil.addToAverage(avergeCount, average, 20.0, 20.0);
-        assertEquals(1.0, newAverage, DELTA);
+        assertThat(newAverage).isCloseTo(1.0, within(DELTA));
 
         newAverage = MetricsUtil.addToAverage(avergeCount, average, 0, 0);
-        assertEquals(1.0, newAverage, DELTA);
+        assertThat(newAverage).isCloseTo(1.0, within(DELTA));
     }
 
     @Test
@@ -29,12 +30,12 @@ class MetricsUtilTest {
         double avergeCount = 1.0;
 
         double newAverage = MetricsUtil.addAverages(avergeCount, average, 5.0, 1.0);
-        assertEquals(1.0, newAverage, DELTA);
+        assertThat(newAverage).isCloseTo(1.0, within(DELTA));
 
         newAverage = MetricsUtil.addAverages(avergeCount, average, 20.0, 1.0);
-        assertEquals(1.0, newAverage, DELTA);
+        assertThat(newAverage).isCloseTo(1.0, within(DELTA));
 
         newAverage = MetricsUtil.addAverages(avergeCount, average, 0, 0);
-        assertEquals(1.0, newAverage, DELTA);
+        assertThat(newAverage).isCloseTo(1.0, within(DELTA));
     }
 }

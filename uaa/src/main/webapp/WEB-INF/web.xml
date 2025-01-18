@@ -1,11 +1,26 @@
 <?xml version="1.0" encoding="ISO-8859-1"?>
 <web-app xmlns="http://java.sun.com/xml/ns/javaee" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://java.sun.com/xml/ns/javaee http://java.sun.com/xml/ns/javaee/web-app_3_0.xsd"
-         version="3.0"
-         metadata-complete="true">
+          xsi:schemaLocation="http://java.sun.com/xml/ns/javaee http://java.sun.com/xml/ns/javaee/web-app_3_0.xsd"
+          version="3.0"
+          metadata-complete="true">
     <absolute-ordering/>
     <display-name>Oauth 2 / Open ID / Identity Server</display-name>
     <description>CloudFoundry Identity Server</description>
+
+    <filter>
+        <filter-name>rateLimitingFilter</filter-name>
+        <filter-class>org.cloudfoundry.identity.uaa.ratelimiting.RateLimitingFilter</filter-class>
+        <init-param>
+            <param-name>contextAttribute</param-name>
+            <param-value>org.springframework.web.servlet.FrameworkServlet.CONTEXT.spring</param-value>
+        </init-param>
+    </filter>
+
+    <!--    <filter>-->
+    <!--        &lt;!&ndash; matches SamlConfiguration.AGGREGATE_SPRING_SECURITY_FILTER_CHAIN_ID &ndash;&gt;-->
+    <!--        <filter-name>aggregateSpringSecurityFilterChain</filter-name>-->
+    <!--        <filter-class>org.springframework.web.filter.DelegatingFilterProxy</filter-class>-->
+    <!--    </filter>-->
 
     <filter>
         <filter-name>springSessionRepositoryFilter</filter-name>
@@ -53,6 +68,11 @@
     </filter>
 
     <filter-mapping>
+        <filter-name>rateLimitingFilter</filter-name>
+        <url-pattern>/*</url-pattern>
+    </filter-mapping>
+
+    <filter-mapping>
         <filter-name>HttpHeaderSecurityFilter</filter-name>
         <url-pattern>/*</url-pattern>
     </filter-mapping>
@@ -80,6 +100,13 @@
         <url-pattern>/*</url-pattern>
     </filter-mapping>
 
+    <!--    <filter-mapping>-->
+    <!--        <filter-name>aggregateSpringSecurityFilterChain</filter-name>-->
+    <!--        <url-pattern>/saml/metadata/*</url-pattern>-->
+    <!--        <dispatcher>REQUEST</dispatcher>-->
+    <!--        <dispatcher>FORWARD</dispatcher>-->
+    <!--    </filter-mapping>-->
+
     <servlet>
         <servlet-name>spring</servlet-name>
         <servlet-class>org.springframework.web.servlet.DispatcherServlet</servlet-class>
@@ -89,7 +116,7 @@
         </init-param>
         <init-param>
             <param-name>dispatchTraceRequest</param-name>
-            <param-value>true</param-value>
+            <param-value>false</param-value>
         </init-param>
         <load-on-startup>1</load-on-startup>
     </servlet>
@@ -110,6 +137,16 @@
     </error-page>
 
     <error-page>
+        <error-code>429</error-code>
+        <location>/error429</location>
+    </error-page>
+
+    <error-page>
         <location>/error</location>
+    </error-page>
+
+    <error-page>
+        <exception-type>org.springframework.security.web.firewall.RequestRejectedException</exception-type>
+        <location>/rejected</location>
     </error-page>
 </web-app>

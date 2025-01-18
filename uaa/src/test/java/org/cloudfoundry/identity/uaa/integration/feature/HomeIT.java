@@ -1,4 +1,5 @@
-/*******************************************************************************
+/*
+ * *****************************************************************************
  *     Cloud Foundry
  *     Copyright (c) [2009-2016] Pivotal Software, Inc. All Rights Reserved.
  *
@@ -12,30 +13,28 @@
  *******************************************************************************/
 package org.cloudfoundry.identity.uaa.integration.feature;
 
-import org.hamcrest.Matchers;
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.runner.RunWith;
+import org.cloudfoundry.identity.uaa.oauth.client.test.TestAccounts;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.RegisterExtension;
 import org.openqa.selenium.By;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.security.oauth2.client.test.TestAccounts;
-import org.springframework.test.context.ContextConfiguration;
-import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
+import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
 
-@RunWith(SpringJUnit4ClassRunner.class)
-@ContextConfiguration(classes = DefaultIntegrationTestConfig.class)
-public class HomeIT {
+import static org.assertj.core.api.Assertions.assertThat;
+
+@SpringJUnitConfig(classes = DefaultIntegrationTestConfig.class)
+class HomeIT {
     @Autowired
     TestAccounts testAccounts;
 
-    @Autowired @Rule
-    public IntegrationTestRule integrationTestRule;
+    @Autowired
+    @RegisterExtension
+    private IntegrationTestExtension integrationTestExtension;
 
     @Autowired
     WebDriver webDriver;
@@ -45,19 +44,19 @@ public class HomeIT {
 
     private HomePagePerspective asOnHomePage;
 
-    @After
-    public void logout_and_clear_cookies() {
+    @AfterEach
+    void logout_and_clear_cookies() {
         try {
             webDriver.get(baseUrl + "/logout.do");
-        }catch (org.openqa.selenium.TimeoutException x) {
+        } catch (org.openqa.selenium.TimeoutException x) {
             //try again - this should not be happening - 20 second timeouts
             webDriver.get(baseUrl + "/logout.do");
         }
         webDriver.manage().deleteAllCookies();
     }
 
-    @Before
-    public void setUp() {
+    @BeforeEach
+    void setUp() {
         logout_and_clear_cookies();
         webDriver.get(baseUrl + "/login");
         webDriver.findElement(By.name("username")).sendKeys(testAccounts.getUserName());
@@ -68,24 +67,24 @@ public class HomeIT {
     }
 
     @Test
-    public void testMessage() {
-        Assert.assertEquals("Where to?", webDriver.findElement(By.tagName("h1")).getText());
+    void message() {
+        assertThat(webDriver.findElement(By.tagName("h1")).getText()).isEqualTo("Where to?");
     }
 
     @Test
-    public void theHeaderDropdown() {
-        Assert.assertNotNull(asOnHomePage.getUsernameElement());
-        Assert.assertFalse(asOnHomePage.getAccountSettingsElement().isDisplayed());
-        Assert.assertFalse(asOnHomePage.getSignOutElement().isDisplayed());
+    void theHeaderDropdown() {
+        assertThat(asOnHomePage.getUsernameElement()).isNotNull();
+        assertThat(asOnHomePage.getAccountSettingsElement().isDisplayed()).isFalse();
+        assertThat(asOnHomePage.getSignOutElement().isDisplayed()).isFalse();
 
         asOnHomePage.getUsernameElement().click();
 
-        Assert.assertTrue(asOnHomePage.getAccountSettingsElement().isDisplayed());
-        Assert.assertTrue(asOnHomePage.getSignOutElement().isDisplayed());
+        assertThat(asOnHomePage.getAccountSettingsElement().isDisplayed()).isTrue();
+        assertThat(asOnHomePage.getSignOutElement().isDisplayed()).isTrue();
 
         asOnHomePage.getAccountSettingsElement().click();
 
-        Assert.assertThat(webDriver.findElement(By.cssSelector("h1")).getText(), Matchers.containsString("Account Settings"));
+        assertThat(webDriver.findElement(By.cssSelector("h1")).getText()).contains("Account Settings");
     }
 
     static class HomePagePerspective {

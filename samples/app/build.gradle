@@ -3,17 +3,15 @@ apply(plugin: "war")
 description = "Sample user webapp for Cloudfoundry Identity Services"
 dependencies {
     Project identityParent = parent.parent
-    Project identityServer = identityParent.subprojects.find { it.name.equals("cloudfoundry-identity-server") }
+    Project identityServer = identityParent.subprojects.find { "cloudfoundry-identity-server".equals(it.name) }
 
     implementation(identityServer)
-    implementation(libraries.springSecurityOauth) {
-        exclude(module: "commons-codec")
-        exclude(module: "jackson-mapper-asl")
-        exclude(module: "spring-security-web")
-    }
 
     providedCompile(libraries.tomcatEmbed)
     runtimeOnly(libraries.javaxServlet)
+    implementation(libraries.springWeb)
+    implementation(libraries.springWebMvc)
+    implementation(libraries.springSecurityCore)
     runtimeOnly(libraries.springSecurityConfig) {
         exclude(module: "spring-aop")
     }

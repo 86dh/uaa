@@ -15,6 +15,7 @@ import org.cloudfoundry.identity.uaa.zone.MergedZoneBrandingInformation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Controller;
@@ -24,6 +25,7 @@ import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.util.UriComponentsBuilder;
 import org.thymeleaf.TemplateEngine;
 import org.thymeleaf.context.Context;
 
@@ -45,25 +47,29 @@ public class ResetPasswordController {
     private final ExpiringCodeStore codeStore;
     private final UaaUserDatabase userDatabase;
 
+    private final String externalLoginUrl;
+
     public ResetPasswordController(
             final ResetPasswordService resetPasswordService,
             final MessageService messageService,
             final @Qualifier("mailTemplateEngine") TemplateEngine templateEngine,
             final ExpiringCodeStore codeStore,
-            final UaaUserDatabase userDatabase
+            final UaaUserDatabase userDatabase,
+            final @Value("${login.url}") String externalLoginUrl
     ) {
         this.resetPasswordService = resetPasswordService;
         this.messageService = messageService;
         this.templateEngine = templateEngine;
         this.codeStore = codeStore;
         this.userDatabase = userDatabase;
+        this.externalLoginUrl = externalLoginUrl;
     }
 
     @RequestMapping(value = "/forgot_password", method = RequestMethod.GET)
     public String forgotPasswordPage(Model model,
-                                     @RequestParam(required = false, value = "client_id") String clientId,
-                                     @RequestParam(required = false, value = "redirect_uri") String redirectUri,
-                                     HttpServletResponse response) {
+            @RequestParam(required = false, value = "client_id") String clientId,
+            @RequestParam(required = false, value = "redirect_uri") String redirectUri,
+            HttpServletResponse response) {
         if (!IdentityZoneHolder.get().getConfig().getLinks().getSelfService().isSelfServiceLinksEnabled()) {
             return handleSelfServiceDisabled(model, response, "error_message_code", "self_service_disabled");
         }
@@ -74,7 +80,7 @@ public class ResetPasswordController {
 
     @RequestMapping(value = "/forgot_password.do", method = RequestMethod.POST)
     public String forgotPassword(Model model, @RequestParam("username") String username, @RequestParam(value = "client_id", defaultValue = "") String clientId,
-                                 @RequestParam(value = "redirect_uri", defaultValue = "") String redirectUri, HttpServletResponse response) {
+            @RequestParam(value = "redirect_uri", defaultValue = "") String redirectUri, HttpServletResponse response) {
         if (!IdentityZoneHolder.get().getConfig().getLinks().getSelfService().isSelfServiceLinksEnabled()) {
             return handleSelfServiceDisabled(model, response, "error_message_code", "self_service_disabled");
         }
@@ -115,7 +121,12 @@ public class ResetPasswordController {
     }
 
     private String getCodeSentEmailHtml(String code) {
-        String resetUrl = UaaUrlUtils.getUaaUrl("/reset_password", IdentityZoneHolder.get());
+        String resetUrl;
+        if (UaaUrlUtils.isUrl(externalLoginUrl)) {
+            resetUrl = UaaUrlUtils.getUaaUrl(UriComponentsBuilder.fromUriString(externalLoginUrl).path("/reset_password"), true, IdentityZoneHolder.get());
+        } else {
+            resetUrl = UaaUrlUtils.getUaaUrl("/reset_password", IdentityZoneHolder.get());
+        }
 
         final Context ctx = new Context();
         ctx.setVariable("serviceName", getServiceName());
@@ -145,15 +156,20 @@ public class ResetPasswordController {
 
     @RequestMapping(value = "/email_sent", method = RequestMethod.GET)
     public String emailSentPage(@ModelAttribute("code") String code,
-                                HttpServletResponse response) {
+            HttpServletResponse response) {
         response.addHeader("Content-Security-Policy", "frame-ancestors 'none'");
         return "email_sent";
     }
 
+    @RequestMapping(value = "/reset_password", method = RequestMethod.HEAD)
+    public void resetPassword() {
+        // Some mail providers initially send a HEAD request to check the validity of the link before redirecting users.
+    }
+
     @RequestMapping(value = "/reset_password", method = RequestMethod.GET, params = {"code"})
     public String resetPasswordPage(Model model,
-                                    HttpServletResponse response,
-                                    @RequestParam("code") String code) {
+            HttpServletResponse response,
+            @RequestParam("code") String code) {
 
         ExpiringCode expiringCode = checkIfUserExists(codeStore.retrieveCode(code, IdentityZoneHolder.get().getId()));
         if (expiringCode == null) {
@@ -197,13 +213,13 @@ public class ResetPasswordController {
 
     @RequestMapping(value = "/reset_password.do", method = RequestMethod.POST)
     public void resetPassword(Model model,
-                              @RequestParam("code") String code,
-                              @RequestParam("email") String email,
-                              @RequestParam("password") String password,
-                              @RequestParam("password_confirmation") String passwordConfirmation,
-                              HttpServletRequest request,
-                              HttpServletResponse response,
-                              HttpSession session) {
+            @RequestParam("code") String code,
+            @RequestParam("email") String email,
+            @RequestParam("password") String password,
+            @RequestParam("password_confirmation") String passwordConfirmation,
+            HttpServletRequest request,
+            HttpServletResponse response,
+            HttpSession session) {
 
 
     }

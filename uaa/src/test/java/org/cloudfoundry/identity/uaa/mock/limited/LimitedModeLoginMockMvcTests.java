@@ -25,7 +25,7 @@ import org.springframework.web.context.WebApplicationContext;
 
 import java.io.File;
 
-import static org.junit.Assert.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 
 class LimitedModeLoginMockMvcTests extends LoginMockMvcTests {
     private File originalLimitedModeStatusFile;
@@ -38,7 +38,7 @@ class LimitedModeLoginMockMvcTests extends LoginMockMvcTests {
         originalLimitedModeStatusFile = MockMvcUtils.getLimitedModeStatusFile(webApplicationContext);
         MockMvcUtils.setLimitedModeStatusFile(webApplicationContext);
 
-        assertTrue(isLimitedMode(limitedModeUaaFilter));
+        assertThat(isLimitedMode(limitedModeUaaFilter)).isTrue();
     }
 
     @AfterEach

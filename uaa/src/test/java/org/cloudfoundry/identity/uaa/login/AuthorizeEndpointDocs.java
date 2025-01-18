@@ -2,7 +2,6 @@ package org.cloudfoundry.identity.uaa.login;
 
 import org.cloudfoundry.identity.uaa.authentication.UaaAuthentication;
 import org.cloudfoundry.identity.uaa.authentication.UaaPrincipal;
-import org.cloudfoundry.identity.uaa.login.util.RandomValueStringGenerator;
 import org.cloudfoundry.identity.uaa.mock.EndpointDocs;
 import org.cloudfoundry.identity.uaa.mock.util.MockMvcUtils;
 import org.cloudfoundry.identity.uaa.oauth.pkce.PkceValidationService;
@@ -11,8 +10,8 @@ import org.cloudfoundry.identity.uaa.scim.ScimUserProvisioning;
 import org.cloudfoundry.identity.uaa.scim.jdbc.JdbcScimUserProvisioning;
 import org.cloudfoundry.identity.uaa.test.UaaTestAccounts;
 import org.cloudfoundry.identity.uaa.user.UaaAuthority;
+import org.cloudfoundry.identity.uaa.util.AlphanumericRandomValueStringGenerator;
 import org.cloudfoundry.identity.uaa.zone.IdentityZoneHolder;
-import org.junit.Assert;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -27,10 +26,15 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.cloudfoundry.identity.uaa.oauth.common.util.OAuth2Utils.CLIENT_ID;
+import static org.cloudfoundry.identity.uaa.oauth.common.util.OAuth2Utils.REDIRECT_URI;
+import static org.cloudfoundry.identity.uaa.oauth.common.util.OAuth2Utils.RESPONSE_TYPE;
+import static org.cloudfoundry.identity.uaa.oauth.common.util.OAuth2Utils.SCOPE;
+import static org.cloudfoundry.identity.uaa.oauth.common.util.OAuth2Utils.STATE;
 import static org.cloudfoundry.identity.uaa.oauth.token.TokenConstants.ID_TOKEN_HINT_PROMPT;
 import static org.cloudfoundry.identity.uaa.oauth.token.TokenConstants.ID_TOKEN_HINT_PROMPT_NONE;
 import static org.cloudfoundry.identity.uaa.test.SnippetUtils.parameterWithName;
-import static org.hamcrest.Matchers.containsString;
 import static org.springframework.http.MediaType.APPLICATION_FORM_URLENCODED;
 import static org.springframework.restdocs.headers.HeaderDocumentation.headerWithName;
 import static org.springframework.restdocs.headers.HeaderDocumentation.requestHeaders;
@@ -40,11 +44,6 @@ import static org.springframework.restdocs.mockmvc.RestDocumentationRequestBuild
 import static org.springframework.restdocs.payload.JsonFieldType.STRING;
 import static org.springframework.restdocs.request.RequestDocumentation.requestParameters;
 import static org.springframework.restdocs.snippet.Attributes.key;
-import static org.springframework.security.oauth2.common.util.OAuth2Utils.CLIENT_ID;
-import static org.springframework.security.oauth2.common.util.OAuth2Utils.REDIRECT_URI;
-import static org.springframework.security.oauth2.common.util.OAuth2Utils.RESPONSE_TYPE;
-import static org.springframework.security.oauth2.common.util.OAuth2Utils.SCOPE;
-import static org.springframework.security.oauth2.common.util.OAuth2Utils.STATE;
 import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -125,7 +124,7 @@ class AuthorizeEndpointDocs extends EndpointDocs {
                 .param(REDIRECT_URI, "http://localhost/redirect/cf")
                 .param(PkceValidationService.CODE_CHALLENGE, UaaTestAccounts.CODE_CHALLENGE)
                 .param(PkceValidationService.CODE_CHALLENGE_METHOD, UaaTestAccounts.CODE_CHALLENGE_METHOD_S256)
-                .param(STATE, new RandomValueStringGenerator().generate());
+                .param(STATE, new AlphanumericRandomValueStringGenerator().generate());
 
         Snippet requestParameters = requestParameters(
                 responseTypeParameter.description("Space-delimited list of response types. Here, `code` for requesting an authorization code for an access token, as per OAuth spec"),
@@ -176,7 +175,7 @@ class AuthorizeEndpointDocs extends EndpointDocs {
                         responseHeaders,
                         requestParameters)).andReturn();
         String location = mvcResult.getResponse().getHeader("Location");
-        Assert.assertThat(location, containsString("access_token="));
+        assertThat(location).contains("access_token=");
     }
 
     @Test
@@ -241,7 +240,7 @@ class AuthorizeEndpointDocs extends EndpointDocs {
                         responseHeaders,
                         requestParameters)).andReturn();
         String location = mvcResult.getResponse().getHeader("Location");
-        Assert.assertThat(location, containsString("id_token="));
+        assertThat(location).contains("id_token=");
     }
 
     @Test
@@ -278,8 +277,8 @@ class AuthorizeEndpointDocs extends EndpointDocs {
                         responseHeaders,
                         requestParameters)).andReturn();
         String location = mvcResult.getResponse().getHeader("Location");
-        Assert.assertThat(location, containsString("id_token="));
-        Assert.assertThat(location, containsString("access_token="));
+        assertThat(location).contains("id_token=")
+                .contains("access_token=");
     }
 
     @Test
@@ -316,8 +315,8 @@ class AuthorizeEndpointDocs extends EndpointDocs {
                         responseHeaders,
                         requestParameters)).andReturn();
         String location = mvcResult.getResponse().getHeader("Location");
-        Assert.assertThat(location, containsString("id_token="));
-        Assert.assertThat(location, containsString("code="));
+        assertThat(location).contains("id_token=")
+                .contains("code=");
     }
 
     private static void resetMarissaPassword(ScimUserProvisioning scimUserProvisioning) {

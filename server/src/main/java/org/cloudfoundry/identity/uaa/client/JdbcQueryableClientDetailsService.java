@@ -10,11 +10,10 @@ import org.cloudfoundry.identity.uaa.zone.MultitenantJdbcClientDetailsService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
+import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.oauth2.provider.ClientDetails;
-import org.springframework.security.oauth2.provider.client.BaseClientDetails;
+import org.cloudfoundry.identity.uaa.oauth.provider.ClientDetails;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
@@ -42,7 +41,7 @@ public class JdbcQueryableClientDetailsService
 
     public JdbcQueryableClientDetailsService(
             final @Qualifier("jdbcClientDetailsService") MultitenantJdbcClientDetailsService delegate,
-            final JdbcTemplate jdbcTemplate,
+            final @Qualifier("namedJdbcTemplate") NamedParameterJdbcTemplate jdbcTemplate,
             final JdbcPagingListFactory pagingListFactory) {
         super(jdbcTemplate, pagingListFactory, new ClientDetailsRowMapper());
         this.delegate = delegate;
@@ -96,7 +95,7 @@ public class JdbcQueryableClientDetailsService
 
         @Override
         public ClientDetails mapRow(ResultSet rs, int rowNum) throws SQLException {
-            BaseClientDetails details = new BaseClientDetails(rs.getString(1), rs.getString(3), rs.getString(4),
+            UaaClientDetails details = new UaaClientDetails(rs.getString(1), rs.getString(3), rs.getString(4),
                     rs.getString(5), rs.getString(7), rs.getString(6));
             details.setClientSecret(rs.getString(2));
             if (rs.getObject(8) != null) {

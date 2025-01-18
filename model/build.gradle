@@ -8,22 +8,25 @@ dependencies {
 
     implementation(libraries.javaxValidationApi)
 
+    implementation(libraries.commonsCodec)
     implementation(libraries.commonsIo)
 
     implementation(libraries.springWeb)
     implementation(libraries.springWebMvc)
     implementation(libraries.springSecurityConfig)
 
-    implementation(libraries.springSecurityOauth) {
-        exclude(module: "jackson-mapper-asl")
-        exclude(module: "spring-security-web")
-    }
+    implementation(libraries.nimbusJwt)
 
     implementation(libraries.slf4jApi)
 
-    testImplementation(libraries.junit)
+    testImplementation(libraries.springBootStarterTest)
+    testImplementation(libraries.hamcrest)
+    testImplementation(libraries.junit5JupiterApi)
+    testImplementation(libraries.junit5JupiterParams)
 
     testImplementation(libraries.jsonAssert)
+
+    implementation(libraries.nimbusJwt)
 }
 
 apply(from: file("build_properties.gradle"))

@@ -1,4 +1,5 @@
-/*******************************************************************************
+/*
+ * *****************************************************************************
  *     Cloud Foundry 
  *     Copyright (c) [2009-2016] Pivotal Software, Inc. All Rights Reserved.
  *
@@ -12,15 +13,15 @@
  *******************************************************************************/
 package org.cloudfoundry.identity.uaa.authentication.manager;
 
+import org.cloudfoundry.identity.uaa.oauth.provider.OAuth2Authentication;
+import org.cloudfoundry.identity.uaa.oauth.provider.error.OAuth2AuthenticationEntryPoint;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.InsufficientAuthenticationException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.oauth2.common.exceptions.InvalidTokenException;
-import org.springframework.security.oauth2.common.exceptions.OAuth2Exception;
-import org.springframework.security.oauth2.provider.OAuth2Authentication;
-import org.springframework.security.oauth2.provider.error.OAuth2AuthenticationEntryPoint;
+import org.cloudfoundry.identity.uaa.oauth.common.exceptions.InvalidTokenException;
+import org.cloudfoundry.identity.uaa.oauth.common.exceptions.OAuth2Exception;
 import org.springframework.security.web.AuthenticationEntryPoint;
 
 import javax.servlet.Filter;
@@ -62,19 +63,19 @@ public class ScopeAuthenticationFilter implements Filter {
     public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain) throws IOException, ServletException {
         try {
             Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-            if (authentication==null || (!(authentication instanceof OAuth2Authentication))) {
+            if (authentication == null || (!(authentication instanceof OAuth2Authentication))) {
                 throw new InvalidTokenException("Missing oauth token.");
             }
             authenticationManager.authenticate(authentication);
-            chain.doFilter(request,response);
+            chain.doFilter(request, response);
         } catch (OAuth2Exception e) {
             authenticationEntryPoint.commence(
-                (HttpServletRequest)request,
-                (HttpServletResponse)response,
-                new InsufficientAuthenticationException("Insufficient authentication", e));
+                    (HttpServletRequest) request,
+                    (HttpServletResponse) response,
+                    new InsufficientAuthenticationException("Insufficient authentication", e));
             SecurityContextHolder.clearContext();
         } catch (AuthenticationException e) {
-            authenticationEntryPoint.commence((HttpServletRequest)request,(HttpServletResponse)response,e);
+            authenticationEntryPoint.commence((HttpServletRequest) request, (HttpServletResponse) response, e);
             SecurityContextHolder.clearContext();
         }
     }

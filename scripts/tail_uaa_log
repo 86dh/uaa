@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+
+function main() {
+  local port=${PORT:-8080}
+  local log_file_path="${TMPDIR}uaa-${port}/logs/uaa.log"
+  local tailArg="${1:--F}"
+
+  echo "Tailing log for UAA listening on '${port}':"
+  echo "# tail ${tailArg} ${log_file_path}"
+  echo ""
+
+  tail ${tailArg} "${log_file_path}"
+}
+
+main "$@"

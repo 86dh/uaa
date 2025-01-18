@@ -2,6 +2,7 @@ package org.cloudfoundry.identity.uaa.client;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import org.cloudfoundry.identity.uaa.util.JsonUtils;
+import org.cloudfoundry.identity.uaa.util.UaaStringUtils;
 import org.cloudfoundry.identity.uaa.zone.MultitenantClientServices;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -9,7 +10,6 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.dao.IncorrectResultSizeDataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
-import org.springframework.security.oauth2.provider.client.BaseClientDetails;
 import org.springframework.stereotype.Component;
 import org.springframework.util.Assert;
 import org.springframework.util.Base64Utils;
@@ -57,13 +57,13 @@ public class JdbcClientMetadataProvisioning implements ClientMetadataProvisionin
 
     @Override
     public ClientMetadata retrieve(String clientId, String zoneId) {
-        logger.debug("Retrieving UI details for client: " + clientId);
+        logger.debug("Retrieving UI details for client: {}", UaaStringUtils.getCleanedUserControlString(clientId));
         return jdbcTemplate.queryForObject(CLIENT_METADATA_QUERY, mapper, clientId, zoneId);
     }
 
     @Override
     public ClientMetadata update(ClientMetadata resource, String zoneId) {
-        logger.debug("Updating metadata for client: " + resource.getClientId());
+        logger.debug("Updating metadata for client: {}", UaaStringUtils.getCleanedUserControlString(resource.getClientId()));
 
         updateClientNameIfNotEmpty(resource, zoneId);
         int updated = jdbcTemplate.update(CLIENT_METADATA_UPDATE, ps -> {
@@ -94,7 +94,7 @@ public class JdbcClientMetadataProvisioning implements ClientMetadataProvisionin
     protected void updateClientNameIfNotEmpty(ClientMetadata resource, String zoneId) {
         //we don't remove it, only set values
         if (hasText(resource.getClientName())) {
-            BaseClientDetails client = (BaseClientDetails) clientDetailsService.loadClientByClientId(resource.getClientId(), zoneId);
+            UaaClientDetails client = (UaaClientDetails) clientDetailsService.loadClientByClientId(resource.getClientId(), zoneId);
             client.addAdditionalInformation(CLIENT_NAME, resource.getClientName());
             clientDetailsService.updateClientDetails(client, zoneId);
         }

@@ -23,7 +23,7 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -73,7 +73,7 @@ class ClientBasicAuthenticationFilterTests {
             UsernamePasswordAuthenticationToken token = new UsernamePasswordAuthenticationToken(clientId, clientSecret);
             token.setDetails(uaaAuthenticationDetailsSource.buildDetails(request));
             verify(clientAuthenticationManager).authenticate(token);
-            assertEquals(clientId, request.getAttribute("clientId"));
+            assertThat(request.getAttribute("clientId")).isEqualTo(clientId);
         }
 
         @Test
@@ -113,7 +113,7 @@ class ClientBasicAuthenticationFilterTests {
             UsernamePasswordAuthenticationToken token = new UsernamePasswordAuthenticationToken(clientId, clientSecret);
             token.setDetails(uaaAuthenticationDetailsSource.buildDetails(request));
             verify(clientAuthenticationManager).authenticate(token);
-            assertEquals(clientId, request.getAttribute("clientId"));
+            assertThat(request.getAttribute("clientId")).isEqualTo(clientId);
         }
 
         @Test
@@ -131,7 +131,7 @@ class ClientBasicAuthenticationFilterTests {
             UsernamePasswordAuthenticationToken token = new UsernamePasswordAuthenticationToken(clientId, clientSecret);
             token.setDetails(uaaAuthenticationDetailsSource.buildDetails(request));
             verify(clientAuthenticationManager).authenticate(token);
-            assertEquals(clientId, request.getAttribute("clientId"));
+            assertThat(request.getAttribute("clientId")).isEqualTo(clientId);
         }
     }
 

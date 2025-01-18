@@ -1,6 +1,6 @@
 package org.cloudfoundry.identity.uaa.resources.jdbc;
 
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.cloudfoundry.identity.uaa.extensions.SpringProfileCleanupExtension;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.extension.ExtensionContext;
@@ -14,8 +14,8 @@ import java.util.Collections;
 import java.util.List;
 import java.util.stream.Stream;
 
-import static java.util.Collections.EMPTY_LIST;
-import static org.junit.jupiter.api.Assertions.assertSame;
+import static java.util.Collections.emptyList;
+import static org.assertj.core.api.Assertions.assertThat;
 
 @ExtendWith(SpringProfileCleanupExtension.class)
 class LimitSqlAdapterFactoryTest {
@@ -26,7 +26,7 @@ class LimitSqlAdapterFactoryTest {
         public Stream<? extends Arguments> provideArguments(ExtensionContext context) {
             return Stream.of(
                     Arguments.of(null, HsqlDbLimitSqlAdapter.class),
-                    Arguments.of(EMPTY_LIST, HsqlDbLimitSqlAdapter.class),
+                    Arguments.of(emptyList(), HsqlDbLimitSqlAdapter.class),
 
                     Arguments.of(Collections.singletonList("hsqldb"), HsqlDbLimitSqlAdapter.class),
                     Arguments.of(Arrays.asList("hsqldb", "default"), HsqlDbLimitSqlAdapter.class),
@@ -59,19 +59,19 @@ class LimitSqlAdapterFactoryTest {
             System.setProperty("spring.profiles.active", StringUtils.join(profiles, ","));
         }
 
-        assertSame(expectedClazz, LimitSqlAdapterFactory.getLimitSqlAdapter().getClass());
+        assertThat(LimitSqlAdapterFactory.getLimitSqlAdapter().getClass()).isSameAs(expectedClazz);
     }
 
     @ParameterizedTest
     @ArgumentsSource(LimitSqlAdapterArgumentsProvider.class)
     void getLimitSqlAdapter_withStringProfiles(List<String> profiles, Class<?> expectedClazz) {
-        assertSame(expectedClazz, LimitSqlAdapterFactory.getLimitSqlAdapter(StringUtils.join(profiles, ",")).getClass());
+        assertThat(LimitSqlAdapterFactory.getLimitSqlAdapter(StringUtils.join(profiles, ",")).getClass()).isSameAs(expectedClazz);
     }
 
     @ParameterizedTest
     @ArgumentsSource(LimitSqlAdapterArgumentsProvider.class)
     void getLimitSqlAdapter_withListProfiles(List<String> profiles, Class<?> expectedClazz) {
-        assertSame(expectedClazz, LimitSqlAdapterFactory.getLimitSqlAdapter(profiles).getClass());
+        assertThat(LimitSqlAdapterFactory.getLimitSqlAdapter(profiles).getClass()).isSameAs(expectedClazz);
     }
 
 }

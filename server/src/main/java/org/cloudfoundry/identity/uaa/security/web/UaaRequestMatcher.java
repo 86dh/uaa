@@ -1,15 +1,3 @@
-/*******************************************************************************
- *     Cloud Foundry
- *     Copyright (c) [2009-2016] Pivotal Software, Inc. All Rights Reserved.
- *
- *     This product is licensed to you under the Apache License, Version 2.0 (the "License").
- *     You may not use this product except in compliance with the License.
- *
- *     This product includes a number of subcomponents with
- *     separate copyright notices and license terms. Your use of these
- *     subcomponents is subject to the terms and conditions of the
- *     subcomponent's license, as noted in the LICENSE file.
- *******************************************************************************/
 package org.cloudfoundry.identity.uaa.security.web;
 
 import org.slf4j.Logger;
@@ -21,7 +9,11 @@ import org.springframework.security.web.util.matcher.RequestMatcher;
 import org.springframework.util.Assert;
 
 import javax.servlet.http.HttpServletRequest;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Map.Entry;
 
 /**
@@ -45,9 +37,9 @@ public final class UaaRequestMatcher implements RequestMatcher, BeanNameAware {
 
     private HttpMethod method;
 
-    private Map<String, String> parameters = new HashMap<String, String>();
+    private Map<String, String> parameters = new HashMap<>();
 
-    private Map<String, List<String>> expectedHeaders = new HashMap<String, List<String>>();
+    private final Map<String, List<String>> expectedHeaders = new HashMap<>();
 
     private String name;
 
@@ -62,8 +54,6 @@ public final class UaaRequestMatcher implements RequestMatcher, BeanNameAware {
     /**
      * The HttpMethod that the request should be made with. Optional (if null,
      * then all values match)
-     *
-     * @param method
      */
     public void setMethod(HttpMethod method) {
         this.method = method;
@@ -95,9 +85,9 @@ public final class UaaRequestMatcher implements RequestMatcher, BeanNameAware {
     @Override
     public boolean matches(HttpServletRequest request) {
         String message = request.getRequestURI() + "'; '" + request.getContextPath() + path + "' with parameters="
-            + parameters + " and headers " + expectedHeaders;
+                + parameters + " and headers " + expectedHeaders;
         if (logger.isTraceEnabled()) {
-            logger.trace("["+name+"] Checking match of request : '" + message);
+            logger.trace("[" + name + "] Checking match of request : '" + message);
         }
 
         if (!request.getRequestURI().startsWith(request.getContextPath() + path)) {
@@ -114,8 +104,7 @@ public final class UaaRequestMatcher implements RequestMatcher, BeanNameAware {
                 if (!matchesAcceptHeader(requestValue, expectedHeaderEntry.getValue())) {
                     return false;
                 }
-            }
-            else if (!matchesHeader(requestValue, expectedHeaderEntry.getValue())) {
+            } else if (!matchesHeader(requestValue, expectedHeaderEntry.getValue())) {
                 return false;
             }
         }
@@ -128,14 +117,14 @@ public final class UaaRequestMatcher implements RequestMatcher, BeanNameAware {
         }
 
         if (logger.isDebugEnabled()) {
-            logger.debug("["+name+"]Matched request " + message);
+            logger.debug("[" + name + "]Matched request " + message);
         }
         return true;
     }
 
     private boolean matchesHeader(String requestValue, List<String> expectedValues) {
         for (String headerValue : expectedValues) {
-            if ("bearer ".equalsIgnoreCase(headerValue)) {
+            if ("bearer".equalsIgnoreCase(headerValue.trim())) {
                 //case insensitive for Authorization: Bearer match
                 if (requestValue == null || !requestValue.toLowerCase().startsWith(headerValue)) {
                     return false;
@@ -164,10 +153,9 @@ public final class UaaRequestMatcher implements RequestMatcher, BeanNameAware {
 
     @Override
     public boolean equals(Object obj) {
-        if (!(obj instanceof UaaRequestMatcher)) {
+        if (!(obj instanceof UaaRequestMatcher other)) {
             return false;
         }
-        UaaRequestMatcher other = (UaaRequestMatcher) obj;
         if (!this.path.equals(other.path)) {
             return false;
         }
@@ -177,21 +165,17 @@ public final class UaaRequestMatcher implements RequestMatcher, BeanNameAware {
         }
 
         if (!((this.parameters == null && other.parameters == null) || (this.parameters != null && this.parameters
-                        .equals(other.parameters)))) {
+                .equals(other.parameters)))) {
             return false;
         }
 
         if (!((this.accepts == null && other.accepts == null) || (this.accepts != null && this.accepts
-                        .equals(other.accepts)))) {
+                .equals(other.accepts)))) {
             return false;
         }
 
-        if (!((this.expectedHeaders == null && other.expectedHeaders == null) || (this.expectedHeaders != null && this.expectedHeaders
-                        .equals(other.expectedHeaders)))) {
-            return false;
-        }
-
-        return true;
+        return (this.expectedHeaders == null && other.expectedHeaders == null) || (this.expectedHeaders != null && this.expectedHeaders
+                .equals(other.expectedHeaders));
     }
 
     @Override
@@ -212,7 +196,7 @@ public final class UaaRequestMatcher implements RequestMatcher, BeanNameAware {
     @Override
     public String toString() {
         StringBuilder sb = new StringBuilder();
-        sb.append("UAAPath("+name+") ['").append(path).append("'");
+        sb.append("UAAPath(").append(name).append(") ['").append(path).append("'");
 
         if (accepts != null) {
             sb.append(", ").append(accepts);
@@ -232,6 +216,6 @@ public final class UaaRequestMatcher implements RequestMatcher, BeanNameAware {
 
     @Override
     public void setBeanName(String name) {
-        this.name=name;
+        this.name = name;
     }
 }

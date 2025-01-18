@@ -1,4 +1,5 @@
-/*******************************************************************************
+/*
+ * *****************************************************************************
  *     Cloud Foundry
  *     Copyright (c) [2009-2016] Pivotal Software, Inc. All Rights Reserved.
  *
@@ -18,6 +19,7 @@ import org.cloudfoundry.identity.uaa.authentication.UaaAuthenticationDetails;
 import org.cloudfoundry.identity.uaa.authentication.UaaPrincipal;
 import org.cloudfoundry.identity.uaa.authentication.event.IdentityProviderAuthenticationSuccessEvent;
 import org.cloudfoundry.identity.uaa.constants.OriginKeys;
+import org.cloudfoundry.identity.uaa.oauth.provider.OAuth2Authentication;
 import org.cloudfoundry.identity.uaa.user.UaaAuthority;
 import org.cloudfoundry.identity.uaa.user.UaaUser;
 import org.cloudfoundry.identity.uaa.user.UaaUserDatabase;
@@ -34,7 +36,6 @@ import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
-import org.springframework.security.oauth2.provider.OAuth2Authentication;
 
 import java.util.Map;
 
@@ -102,7 +103,7 @@ public class LoginAuthenticationManager implements AuthenticationManager, Applic
                         } catch (UsernameNotFoundException ex) {
                             throw new BadCredentialsException("Bad credentials");
                         }
-                    } else  {
+                    } else {
                         //if add_new=false then this is a bad user ID
                         throw new BadCredentialsException("Bad Credentials");
                     }
@@ -124,7 +125,7 @@ public class LoginAuthenticationManager implements AuthenticationManager, Applic
     }
 
     protected UaaUser getUser(AuthzAuthenticationRequest req, Map<String, String> info) {
-        if(info.get(OriginKeys.ORIGIN)!=null && info.get(OriginKeys.ORIGIN).equals(OriginKeys.UAA)){
+        if (info.get(OriginKeys.ORIGIN) != null && info.get(OriginKeys.ORIGIN).equals(OriginKeys.UAA)) {
             throw new BadCredentialsException("uaa origin not allowed for external login server");
         }
 
@@ -136,16 +137,16 @@ public class LoginAuthenticationManager implements AuthenticationManager, Applic
 
         String name = req.getName();
         return UaaUser.createWithDefaults(u ->
-            u.withId(info.getOrDefault("user_id", NotANumber))
-                .withUsername(name)
-                .withEmail(info.get("email"))
-                .withGivenName(info.get("given_name"))
-                .withFamilyName(info.get("family_name"))
-                .withPassword("")
-                .withAuthorities(UaaAuthority.USER_AUTHORITIES)
-                .withOrigin(info.getOrDefault(OriginKeys.ORIGIN, OriginKeys.LOGIN_SERVER))
-                .withExternalId(name)
-                .withZoneId(identityZoneManager.getCurrentIdentityZoneId())
+                u.withId(info.getOrDefault("user_id", NotANumber))
+                        .withUsername(name)
+                        .withEmail(info.get("email"))
+                        .withGivenName(info.get("given_name"))
+                        .withFamilyName(info.get("family_name"))
+                        .withPassword("")
+                        .withAuthorities(UaaAuthority.USER_AUTHORITIES)
+                        .withOrigin(info.getOrDefault(OriginKeys.ORIGIN, OriginKeys.LOGIN_SERVER))
+                        .withExternalId(name)
+                        .withZoneId(identityZoneManager.getCurrentIdentityZoneId())
         );
     }
 }

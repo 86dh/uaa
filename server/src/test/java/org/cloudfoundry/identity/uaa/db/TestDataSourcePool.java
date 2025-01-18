@@ -6,7 +6,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.jdbc.core.JdbcTemplate;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.assertj.core.api.Assertions.assertThat;
 
 @WithDatabaseContext
 class TestDataSourcePool {
@@ -19,9 +19,9 @@ class TestDataSourcePool {
     private JdbcTemplate jdbcTemplate;
 
     @Test
-    void testValidationQuery() {
+    void validationQuery() {
         int i = jdbcTemplate.queryForObject(this.validationQuery, Integer.class);
-        assertEquals(1, i);
+        assertThat(i).isOne();
     }
 
 }

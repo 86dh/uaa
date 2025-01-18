@@ -13,7 +13,7 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.assertj.core.api.Assertions.assertThat;
 
 @WithDatabaseContext
 @TestPropertySource(properties = {
@@ -35,23 +35,23 @@ class DatabaseParametersTests {
 
     @Test
     void initial_size() {
-        assertEquals(0, dataSource.getInitialSize());
+        assertThat(dataSource.getInitialSize()).isZero();
     }
 
     @Test
     void validation_query_timeout() {
-        assertEquals(5, dataSource.getValidationQueryTimeout());
+        assertThat(dataSource.getValidationQueryTimeout()).isEqualTo(5);
     }
 
     @Test
     void connection_timeout_property_set() {
         switch (vendor) {
             case mysql: {
-                assertEquals("5000", getUrlParameter("connectTimeout"));
+                assertThat(getUrlParameter("connectTimeout")).isEqualTo("5000");
                 break;
             }
             case postgresql: {
-                assertEquals("5", getUrlParameter("connectTimeout"));
+                assertThat(getUrlParameter("connectTimeout")).isEqualTo("5");
                 break;
             }
             case hsqldb: {
@@ -60,7 +60,6 @@ class DatabaseParametersTests {
             default:
                 throw new IllegalStateException("Unrecognized database: " + vendor);
         }
-
     }
 
     String getUrlParameter(String name) {
@@ -74,5 +73,4 @@ class DatabaseParametersTests {
         }
         return null;
     }
-
 }

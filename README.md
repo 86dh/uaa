@@ -1,5 +1,7 @@
 <link href="https://raw.github.com/clownfart/Markdown-CSS/master/markdown.css" rel="stylesheet"></link>
 
+**Slack** [&#35;uaa](https://cloudfoundry.slack.com/archives/C03FXANBV)
+
 # CloudFoundry User Account and Authentication (UAA) Server
 
 The UAA is a multi tenant identity management service, used in Cloud Foundry, but also available
@@ -72,7 +74,7 @@ Security OAuth that can do the heavy lifting if your client is Java.
 ## Quick Start
 
 Requirements:
-* Java 11
+* Java 17
 
 If this works you are in business:
 
@@ -101,19 +103,105 @@ First run the UAA server as described above:
 From another terminal you can use curl to verify that UAA has started by
 requesting system information:
 
-    $ curl -H "Accept: application/json" localhost:8080/uaa/login
-    {
-      "timestamp":"2012-03-28T18:25:49+0100",
-      "commit_id":"111274e",
-      "prompts":{"username":["text","Username"],
-        "password":["password","Password"]
-      }
-    }
+    $ curl --silent --show-error --head localhost:8080/uaa/login | head -1
+    HTTP/1.1 200
 
 For complex requests it is more convenient to interact with UAA using
 `uaac`, the [UAA Command Line Client](https://github.com/cloudfoundry/cf-uaac).
 
-## Integration tests
+### Debugging local server
+
+To load JDWP agent for UAA jvm debugging, start the server as follows:
+```sh
+./gradlew run -Dxdebug=true
+```
+or
+```sh
+./gradlew -Dspring.profiles.active=default,hsqldb,debug run
+```
+You can then attach your debugger to port 5005 of the jvm process.
+
+To suspend the server start-up until the debugger is attached (useful for
+debugging start-up code), start the server as follows:
+```sh
+./gradlew run -Dxdebugs=true
+```
+or
+```sh
+./gradlew -Dspring.profiles.active=default,hsqldb,debugs run
+```
+
+## Running local UAA server with different databases
+`./gradlew run` runs the UAA server with hsqldb database by default.
+
+### MySql
+1. Start the mysql server (e.g. a mysql docker container)
+```sh
+% docker run --name mysql1 -e MYSQL_ROOT_PASSWORD=changeme -d -p3306:3306 mysql
+```
+2. Create the `uaa` database (e.g. in mysql interactive session)
+```sh
+% mysql -h 127.0.0.1 -u root -p
+...
+mysql> create database uaa;
+```
+3. Run the UAA server with the mysql profile
+```sh
+% ./gradlew -Dspring.profiles.active=mysql,default run
+```
+
+### PostgreSQL
+1. Start the postgresql server (e.g. a postgres docker container)
+```sh
+docker run --name postgres1 -p 5432:5432 -e POSTGRES_PASSWORD=mysecretpassword -d postgres
+```
+2. Create the `uaa` database (e.g. in psql interactive session)
+```sh
+% psql -h 127.0.0.1 -U postgres
+```
+```postgresql
+create database uaa;
+create user root with superuser password 'changeme';
+```
+3. Run the UAA server with the postgresql profile
+```sh
+% ./gradlew -Dspring.profiles.active=postgresql,default run
+```
+4. Once the UAA server started, you can see the tables created in the uaa database (e.g. in psql interactive session)
+```postgresql
+\c uaa
+psql (14.5 (Homebrew), server 15.0 (Debian 15.0-1.pgdg110+1))
+WARNING: psql major version 14, server major version 15.
+         Some psql features might not work.
+You are now connected to database "uaa" as user "postgres".
+\d
+List of relations
+ Schema |             Name              |   Type   | Owner
+--------+-------------------------------+----------+-------
+ public | authz_approvals               | table    | root
+ public | expiring_code_store           | table    | root
+ public | external_group_mapping        | table    | root
+ public | external_group_mapping_id_seq | sequence | root
+ public | group_membership              | table    | root
+ public | group_membership_id_seq       | sequence | root
+ public | groups                        | table    | root
+ public | identity_provider             | table    | root
+ public | identity_zone                 | table    | root
+ public | oauth_client_details          | table    | root
+ public | oauth_code                    | table    | root
+ public | oauth_code_id_seq             | sequence | root
+ public | revocable_tokens              | table    | root
+ public | schema_version                | table    | root
+ public | sec_audit                     | table    | root
+ public | sec_audit_id_seq              | sequence | root
+ public | spring_session                | table    | root
+ public | spring_session_attributes     | table    | root
+ public | user_info                     | table    | root
+ public | users                         | table    | root
+(23 rows)
+```
+
+## Running tests
 
 You can run the integration tests with docker
 
@@ -121,7 +209,7 @@ You can run the integration tests with docker
 
 will create a docker container running uaa + ldap + database whereby integration tests are run against.
 
-### Using Gradle to test with postgresql or mysql
+### Using Docker to test with postgresql or mysql
 
 The default uaa unit tests (./gradlew test integrationTest) use hsqldb.
 
@@ -129,16 +217,43 @@ To run the unit tests with docker:
 
     $ run-unit-tests.sh <dbtype>
 
+### Using Gradle to test with Postgres or MySQL
+
+You need a locally running database. You can launch a Postgres 15 and MySQL 8 locally with docker compose:
+
+    $ docker compose --file scripts/docker-compose.yaml up
+
+If you wish to launch only one of the DBs, select the appropriate service name:
+
+    $ docker compose --file scripts/docker-compose.yaml up postgresql
+
+Then run the test with the appropriate profile:
+
+    $ ./gradlew '-Dspring.profiles.active=postgresql,default' \
+        --no-daemon \
+        test
+
+There are special guarantees in place to avoid pollution between tests, so be sure to run the images
+from the compose script, and run your test with `--no-daemon`. To learn more, read [docs/testing.md](docs/testing.md).
+
 ### To run a single test
+
+The default uaa unit tests (`./gradlew test`) use hsqldb. 
 
 Start by finding out which gradle project your test belongs to.
 You can find all project by running
 
     $ ./gradlew projects
 
-Then you can run
-
+To run a specific test class, you can specify the module and the test class. 
+    
     $ ./gradlew :<project name>:test --tests <TestClass>.<MethodName>
+
+In this example, it's running only the 
+JdbcScimGroupMembershipManagerTests tests in the cloudfoundry-identity-server module:
+
+    $ ./gradlew :cloudfoundry-identity-server:test \
+    --tests "org.cloudfoundry.identity.uaa.scim.jdbc.JdbcScimGroupMembershipManagerTests"
 
 or to run all tests in a Class
 
@@ -177,6 +292,27 @@ In CloudFoundry terms
 * `app` is a webapp that needs single sign on and access to the `api`
   service on behalf of users.
 
+## Generating API Documentation
+
+API documentation is generated using the [`spring-restdocs`](https://github.com/spring-projects/spring-restdocs) framework.
+The tests that run this are located in [`uaa/tests`](file:./uaa/src/test/java) folder and are very similar to MockMvc tests.
+
+The formatting of the output documentation is done by using Ruby and [Slate](https://github.com/slatedocs/slate).
+
+To be able to run the command `./gradlew generateDocs` having Ruby 3.3.5 and bundler installed is key.
+
+### Installing Ruby using brew and rbenv
+
+```shell
+brew install rbenv
+rbenv install 3.3.5
+rbenv global 3.3.5 # or use rbenv local 3.3.5
+gem install bundler
+./gradlew generateDocs
+```
+
+The produced documentation can be accessed via [index.html](file:./uaa/build/docs/version/0.0.0/index.html)
+
 # Running the UAA on Kubernetes
 
 __Prerequisites__
@@ -203,6 +339,7 @@ Of course, you can always abandon the default values altogether and provide your
 
 Here are some ways for you to get involved in the community:
 
+* Join uaa on slack [&#35;uaa](https://cloudfoundry.slack.com/archives/C03FXANBV)
 * Create [github](https://github.com/cloudfoundry/uaa/issues) tickets for bugs and new features and comment and
   vote on the ones that you are interested in.
 * Github is for social coding: if you want to write code, we encourage
@@ -210,7 +347,28 @@ Here are some ways for you to get involved in the community:
   [forks of this repository](https://github.com/cloudfoundry/uaa). If you
   want to contribute code this way, please reference an existing issue
   if there is one as well covering the specific issue you are
-  addressing.  Always submit pull requests to the "develop" branch.
+  addressing. Always submit pull requests to the "develop" branch.
   We strictly adhere to test driven development. We kindly ask that
   pull requests are accompanied with test cases that would be failing
   if ran separately from the pull request.
+* After you create the pull request, you can check the code metrics yourself  
+  in [Github Actions](https://github.com/cloudfoundry/uaa/actions) and on [Sonar](https://sonarcloud.io/project/pull_requests_list?id=cloudfoundry-identity-parent). 
+  The goal for new code should be close to 100% tested and clean code: 
+  [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=cloudfoundry-identity-parent&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=cloudfoundry-identity-parent)
+
+# Connecting UAA to local LDAP Server
+
+Requirements:
+* [Docker](https://docs.docker.com/engine/reference/commandline/cli/)
+* [Docker Compose](https://docs.docker.com/compose/reference/)
+
+To debug UAA and LDAP integrations, we use an OpenLdap docker image from [VMWare's Bitnami project](https://github.com/bitnami/bitnami-docker-openldap)
+
+1. Modify file `uaa/src/main/resources/uaa.yml` and enable LDAP by uncommenting line 7, `spring_profiles: ldap,default,hsqldb`
+1. run `docker-compose up` from directory `scripts/ldap`
+2. From `scripts/ldap` verify connectivity to running OpenLdap container by running `docker-confirm-ldapquery.sh`
+3. Start UAA with `./gradlew run`
+4. Navigate to [`/uaa`](http://localhost:8080/uaa) and log in with LDAP user `user01` and password `password1`
+
+Use below command to clean-up container and volume:
+- `docker-compose down --volumes`

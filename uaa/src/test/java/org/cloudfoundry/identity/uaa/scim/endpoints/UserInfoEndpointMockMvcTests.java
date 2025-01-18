@@ -3,6 +3,7 @@ package org.cloudfoundry.identity.uaa.scim.endpoints;
 import org.cloudfoundry.identity.uaa.DefaultTestContext;
 import org.cloudfoundry.identity.uaa.account.UserInfoResponse;
 import org.cloudfoundry.identity.uaa.mock.util.MockMvcUtils;
+import org.cloudfoundry.identity.uaa.oauth.common.util.RandomValueStringGenerator;
 import org.cloudfoundry.identity.uaa.scim.ScimUser;
 import org.cloudfoundry.identity.uaa.test.TestClient;
 import org.cloudfoundry.identity.uaa.user.UaaUserDatabase;
@@ -12,7 +13,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.mock.web.MockHttpServletResponse;
-import org.springframework.security.oauth2.common.util.RandomValueStringGenerator;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
@@ -23,20 +23,18 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.cloudfoundry.identity.uaa.oauth.token.ClaimConstants.ROLES;
 import static org.cloudfoundry.identity.uaa.oauth.token.ClaimConstants.USER_ATTRIBUTES;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @DefaultTestContext
 class UserInfoEndpointMockMvcTests {
 
-    private RandomValueStringGenerator generator = new RandomValueStringGenerator();
-    private String clientId = generator.generate().toLowerCase();
-    private String clientSecret = generator.generate().toLowerCase();
+    private final RandomValueStringGenerator generator = new RandomValueStringGenerator();
+    private final String clientId = generator.generate().toLowerCase();
+    private final String clientSecret = generator.generate().toLowerCase();
 
     private ScimUser user;
 
@@ -93,34 +91,36 @@ class UserInfoEndpointMockMvcTests {
     void testGetUserInfo() throws Exception {
         UserInfoResponse userInfoResponse = getUserInfo("openid");
 
-        assertEquals(user.getUserName(), userInfoResponse.getUserName());
-        assertEquals(user.getFamilyName(), userInfoResponse.getFamilyName());
-        assertEquals(user.getGivenName(), userInfoResponse.getGivenName());
-        assertEquals(user.isVerified(), userInfoResponse.isEmailVerified());
+        assertThat(userInfoResponse.getUserName()).isEqualTo(user.getUserName());
+        assertThat(userInfoResponse.getFamilyName()).isEqualTo(user.getFamilyName());
+        assertThat(userInfoResponse.getGivenName()).isEqualTo(user.getGivenName());
+        assertThat(userInfoResponse.isEmailVerified()).isEqualTo(user.isVerified());
 
         String userId = userInfoResponse.getUserId();
-        assertNotNull(userId);
+        assertThat(userId).isNotNull();
         Long dbPreviousLogonTime = webApplicationContext.getBean(UaaUserDatabase.class).retrieveUserById(userId).getPreviousLogonTime();
-        assertEquals(dbPreviousLogonTime, userInfoResponse.getPreviousLogonSuccess());
+        assertThat(userInfoResponse.getPreviousLogonSuccess()).isEqualTo(dbPreviousLogonTime);
     }
 
     @Test
     void attributesWithRolesAndUserAttributes() throws Exception {
         UserInfoResponse userInfo = getUserInfo("openid user_attributes roles");
         Map<String, List<String>> uas = userInfo.getUserAttributes();
-        assertNotNull(uas);
-        assertEquals(userAttributes, uas);
+        assertThat(uas)
+                .isNotNull()
+                .isEqualTo(userAttributes);
 
         Object r = userInfo.getRoles();
-        assertNotNull(r);
-        assertEquals(roles, r);
+        assertThat(r)
+                .isNotNull()
+                .isEqualTo(roles);
     }
 
     @Test
     void attributesWithNoExtraScopes() throws Exception {
         UserInfoResponse userInfo = getUserInfo("openid");
-        assertNull(userInfo.getUserAttributes());
-        assertNull(userInfo.getRoles());
+        assertThat(userInfo.getUserAttributes()).isNull();
+        assertThat(userInfo.getRoles()).isNull();
     }
 
     private UserInfoResponse getUserInfo(String scopes) throws Exception {
@@ -133,8 +133,8 @@ class UserInfoEndpointMockMvcTests {
         );
 
         MockHttpServletResponse response = mockMvc.perform(
-                get("/userinfo")
-                        .header("Authorization", "Bearer " + userInfoToken))
+                        get("/userinfo")
+                                .header("Authorization", "Bearer " + userInfoToken))
                 .andExpect(status().isOk())
                 .andReturn().getResponse();
 

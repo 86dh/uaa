@@ -23,7 +23,6 @@ import javax.servlet.http.HttpSession;
 import javax.validation.Valid;
 import javax.validation.constraints.Email;
 import java.util.List;
-import java.util.stream.Collectors;
 
 import static org.springframework.web.bind.annotation.RequestMethod.GET;
 import static org.springframework.web.bind.annotation.RequestMethod.POST;
@@ -77,7 +76,7 @@ public class AccountsController {
         }
 
         List<IdentityProvider> identityProviderList = DomainFilter.getIdpsForEmailDomain(identityProviderProvisioning.retrieveAll(true, IdentityZoneHolder.get().getId()), email.getEmail());
-        identityProviderList = identityProviderList.stream().filter(idp -> !idp.getOriginKey().equals(OriginKeys.UAA)).collect(Collectors.toList());
+        identityProviderList = identityProviderList.stream().filter(idp -> !idp.getOriginKey().equals(OriginKeys.UAA)).toList();
         if (!identityProviderList.isEmpty()) {
             model.addAttribute("email", email.getEmail());
             return handleUnprocessableEntity(model, response, "error_message_code", "other_idp");
@@ -99,6 +98,12 @@ public class AccountsController {
     @RequestMapping(value = "/accounts/email_sent", method = RequestMethod.GET)
     public String emailSent() {
         return "accounts/email_sent";
+    }
+
+    @RequestMapping(value = "/verify_user", method = RequestMethod.HEAD)
+    public String verifyUser() {
+        // Some mail providers initially send a HEAD request to check the validity of the link before redirecting users.
+        return "redirect:/login";
     }
 
     @RequestMapping(value = "/verify_user", method = GET)

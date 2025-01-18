@@ -20,6 +20,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.StringTokenizer;
 import java.util.regex.Pattern;
@@ -30,7 +31,8 @@ import static org.springframework.util.StringUtils.hasText;
 import static org.springframework.util.StringUtils.hasLength;
 
 public abstract class UaaUrlUtils {
-    private UaaUrlUtils() {}
+    private UaaUrlUtils() {
+    }
 
     /** Pattern that matches valid subdomains.
     *  According to https://tools.ietf.org/html/rfc3986#section-3.2.2
@@ -46,18 +48,22 @@ public abstract class UaaUrlUtils {
     }
 
     public static String getUaaUrl(String path, boolean zoneSwitchPossible, IdentityZone currentIdentityZone) {
-        return getURIBuilder(path, zoneSwitchPossible, currentIdentityZone).build().toUriString();
+        return getURIBuilder(path, zoneSwitchPossible, currentIdentityZone, null).build().toUriString();
+    }
+
+    public static String getUaaUrl(UriComponentsBuilder builder, boolean zoneSwitchPossible, IdentityZone currentIdentityZone) {
+        return getURIBuilder(null, zoneSwitchPossible, currentIdentityZone, builder).build().toUriString();
     }
 
     public static String getUaaHost(IdentityZone currentIdentityZone) {
-        return getURIBuilder("", false, currentIdentityZone).build().getHost();
+        return getURIBuilder(UaaStringUtils.EMPTY_STRING, false, currentIdentityZone, null).build().getHost();
     }
 
     private static UriComponentsBuilder getURIBuilder(
             String path,
             boolean zoneSwitchPossible,
-            IdentityZone currentIdentityZone) {
-        UriComponentsBuilder builder = ServletUriComponentsBuilder.fromCurrentContextPath().path(path);
+            IdentityZone currentIdentityZone, UriComponentsBuilder baseBuilder) {
+        UriComponentsBuilder builder = baseBuilder != null ? baseBuilder : ServletUriComponentsBuilder.fromCurrentContextPath().path(path);
         if (zoneSwitchPossible) {
             String host = builder.build().getHost();
             if (host != null && !currentIdentityZone.isUaa() &&
@@ -75,7 +81,7 @@ public abstract class UaaUrlUtils {
                     "(([a-zA-Z0-9\\-\\*\\_]+\\.){0,255}" + //subdomains (RFC1035) limited, regex backtracking disabled
                     "[a-zA-Z0-9\\-\\_]+\\.)?" +      //hostname
                     "[a-zA-Z0-9\\-]+" +              //tld
-                    "(:[0-9]+)?(/.*|$)"              //port and path
+                    "((:[0-9]+)|(:\\*))?(/.*|$)"              //port and path
     );
 
     public static boolean isValidRegisteredRedirectUrl(String url) {
@@ -107,10 +113,9 @@ public abstract class UaaUrlUtils {
 
         for (String pattern : ofNullable(redirectUris).orElse(emptyList())) {
             if (matcher.match(pattern, requestedRedirectUri)) {
-                if ( (!pattern.contains("*") && !pattern.contains("?")) || matchHost(pattern, requestedRedirectUri, matcher)) {
+                if ((!pattern.contains("*") && !pattern.contains("?")) || matchHost(pattern, requestedRedirectUri, matcher)) {
                     return requestedRedirectUri;
-                }
-                else {
+                } else {
                     s_logger.warn(
                             "The URI pattern matched but the hostname pattern did not. Denying the requested redirect URI: whitelisted-pattern='{}' requested-redirect-uri='{}'",
                             pattern, requestedRedirectUri);
@@ -151,7 +156,9 @@ public abstract class UaaUrlUtils {
             hostnameFromPattern = currentToken;
             break;
         }
-        if (hostnameFromPattern == null) return false;
+        if (hostnameFromPattern == null) {
+            return false;
+        }
 
         int colonLocation = hostnameFromPattern.indexOf(':');
         if (colonLocation > 0) {
@@ -184,12 +191,16 @@ public abstract class UaaUrlUtils {
 
     private static String[] decodeValue(List<String> value) {
         if (value == null) {
-            return null;
+            return new String[0];
         }
         String[] result = new String[value.size()];
         int pos = 0;
         for (String s : value) {
-            result[pos++] = UriUtils.decode(s, "UTF-8");
+            if (s == null) {
+                return new String[0];
+            }
+            result[pos] = UriUtils.decode(s, "UTF-8");
+            pos++;
         }
         return result;
     }
@@ -215,7 +226,7 @@ public abstract class UaaUrlUtils {
     public static String addFragmentComponent(String urlString, String component) {
         URI uri = URI.create(urlString);
         UriComponentsBuilder builder = UriComponentsBuilder.fromUri(uri);
-        builder.fragment(hasText(uri.getFragment()) ? uri.getFragment() + "&" + component : component);
+        builder.fragment(hasText(uri.getFragment()) ? (uri.getFragment() + "&" + component) : component);
         return builder.build().toUriString();
     }
 
@@ -225,7 +236,7 @@ public abstract class UaaUrlUtils {
         }
 
         subdomain = subdomain.trim();
-        subdomain = subdomain.endsWith(".") ? subdomain : subdomain + ".";
+        subdomain = subdomain.endsWith(".") ? subdomain : (subdomain + ".");
 
         UriComponentsBuilder builder = UriComponentsBuilder.fromHttpUrl(url);
         builder.host(subdomain + builder.build().getHost());
@@ -235,7 +246,7 @@ public abstract class UaaUrlUtils {
     public static String getSubdomain(String subdomain) {
         if (hasText(subdomain)) {
             subdomain = subdomain.trim();
-            subdomain = subdomain.endsWith(".") ? subdomain : subdomain + ".";
+            subdomain = subdomain.endsWith(".") ? subdomain : (subdomain + ".");
         }
         return subdomain;
     }
@@ -256,13 +267,13 @@ public abstract class UaaUrlUtils {
         String pathInfo = request.getPathInfo();
 
         if (servletPath == null) {
-            servletPath = "";
+            servletPath = UaaStringUtils.EMPTY_STRING;
         }
         if (pathInfo == null) {
-            pathInfo = "";
+            pathInfo = UaaStringUtils.EMPTY_STRING;
         }
 
-        return String.format("%s%s", servletPath, pathInfo);
+        return "%s%s".formatted(servletPath, pathInfo);
     }
 
     public static boolean uriHasMatchingHost(String uri, String hostname) {
@@ -283,13 +294,18 @@ public abstract class UaaUrlUtils {
         UriComponentsBuilder uriComponentsBuilder = UriComponentsBuilder.fromUriString(uri);
         UriComponents nonNormalizedUri = uriComponentsBuilder.build();
 
-        try {
-            uriComponentsBuilder.host(nonNormalizedUri.getHost().toLowerCase());
-            uriComponentsBuilder.scheme(nonNormalizedUri.getScheme().toLowerCase());
-            uriComponentsBuilder.replacePath(decodeUriPath(nonNormalizedUri.getPath()));
-        } catch (NullPointerException e) {
-            throw new IllegalArgumentException("URI host and scheme must not be null");
+        var host = nonNormalizedUri.getHost();
+        if (!hasText(host)) {
+            throw new IllegalArgumentException("URI host must not be null");
         }
+        uriComponentsBuilder.host(host.toLowerCase(Locale.US));
+
+        var schema = nonNormalizedUri.getScheme();
+        if (!hasText(schema)) {
+            throw new IllegalArgumentException("URI scheme must not be null");
+        }
+        uriComponentsBuilder.scheme(schema.toLowerCase(Locale.US));
+        uriComponentsBuilder.replacePath(decodeUriPath(nonNormalizedUri.getPath()));
 
         return uriComponentsBuilder.build().toString();
     }

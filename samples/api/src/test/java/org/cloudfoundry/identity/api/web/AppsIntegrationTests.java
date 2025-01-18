@@ -1,5 +1,6 @@
-/*******************************************************************************
- *     Cloud Foundry 
+/*
+ * *****************************************************************************
+ *     Cloud Foundry
  *     Copyright (c) [2009-2016] Pivotal Software, Inc. All Rights Reserved.
  *
  *     This product is licensed to you under the Apache License, Version 2.0 (the "License").
@@ -12,58 +13,52 @@
  *******************************************************************************/
 package org.cloudfoundry.identity.api.web;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotSame;
-import static org.junit.Assert.assertTrue;
-
-import org.cloudfoundry.identity.uaa.test.TestAccountSetup;
+import org.cloudfoundry.identity.uaa.oauth.client.test.OAuth2ContextConfiguration;
+import org.cloudfoundry.identity.uaa.oauth.common.OAuth2AccessToken;
+import org.cloudfoundry.identity.uaa.test.TestAccountExtension;
 import org.cloudfoundry.identity.uaa.test.UaaTestAccounts;
-import org.junit.Rule;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.RegisterExtension;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.oauth2.client.test.OAuth2ContextConfiguration;
-import org.springframework.security.oauth2.client.test.OAuth2ContextSetup;
-import org.springframework.security.oauth2.common.OAuth2AccessToken;
-import org.springframework.web.client.RestOperations;
+import org.springframework.web.client.RestTemplate;
+
+import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * @author Dave Syer
  */
 @OAuth2ContextConfiguration
-public class AppsIntegrationTests {
+class AppsIntegrationTests {
 
-    @Rule
-    public ServerRunning serverRunning = ServerRunning.isRunning();
+    @RegisterExtension
+    private static final ServerRunningExtension serverRunning = ServerRunningExtension.connect();
 
-    private UaaTestAccounts testAccounts = UaaTestAccounts.standard(serverRunning);
+    private static final UaaTestAccounts testAccounts = UaaTestAccounts.standard(serverRunning);
 
-    @Rule
-    public OAuth2ContextSetup context = OAuth2ContextSetup.withTestAccounts(serverRunning, testAccounts);
+    @RegisterExtension
+    private static final TestAccountExtension testAccountExtension = TestAccountExtension.standard(serverRunning, testAccounts);
 
-    @Rule
-    public TestAccountSetup testAccountSetup = TestAccountSetup.standard(serverRunning, testAccounts);
+    @RegisterExtension
+    private static final OAuth2ContextExtension context = OAuth2ContextExtension.withTestAccounts(serverRunning, testAccountExtension);
 
     /**
      * tests a happy-day flow of the native application profile.
      */
     @Test
-    public void testHappyDay() {
-
-        RestOperations restTemplate = serverRunning.createRestTemplate();
+    void happyDay() {
+        RestTemplate restTemplate = serverRunning.createRestTemplate();
         ResponseEntity<String> response = restTemplate.getForEntity(serverRunning.getUrl("/api/apps"), String.class);
-        // first make sure the resource is actually protected.
-        assertNotSame(HttpStatus.OK, response.getStatusCode());
+        // first, make sure the resource is actually protected.
+        assertThat(response.getStatusCode()).isNotSameAs(HttpStatus.OK);
         HttpHeaders approvalHeaders = new HttpHeaders();
         OAuth2AccessToken accessToken = context.getAccessToken();
         approvalHeaders.set("Authorization", "bearer " + accessToken.getValue());
 
-        ResponseEntity<String> result = serverRunning.getForString("/api/apps");
-        assertEquals(HttpStatus.OK, result.getStatusCode());
+        ResponseEntity<String> result = serverRunning.getForString("/api/apps", approvalHeaders);
+        assertThat(result.getStatusCode()).isEqualTo(HttpStatus.OK);
         String body = result.getBody();
-        assertTrue("Wrong response: " + body, body.contains("dsyerapi.cloudfoundry.com"));
-
+        assertThat(body).as("Wrong response: " + body).contains("dsyerapi.cloudfoundry.com");
     }
-
 }

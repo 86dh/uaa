@@ -17,19 +17,16 @@ import java.io.IOException;
 
 public class PasswordChangeUiRequiredFilter extends OncePerRequestFilter {
 
-    private final static String MATCH_PATH = "/force_password_change";
-    private final static String IGNORE_PATH = "/login/mfa/**";
-    private final static String COMPLETED_PATH = "/force_password_change_completed";
+    private static final String MATCH_PATH = "/force_password_change";
+    private static final String COMPLETED_PATH = "/force_password_change_completed";
 
     private final AntPathRequestMatcher matchPath;
-    private final AntPathRequestMatcher ignorePath;
     private final AntPathRequestMatcher completedPath;
     private final UaaSavedRequestCache cache;
 
     public PasswordChangeUiRequiredFilter(final UaaSavedRequestCache cache) {
         this.cache = cache;
         this.matchPath = new AntPathRequestMatcher(MATCH_PATH);
-        this.ignorePath = new AntPathRequestMatcher(IGNORE_PATH);
         this.completedPath = new AntPathRequestMatcher(COMPLETED_PATH);
     }
 
@@ -38,10 +35,7 @@ public class PasswordChangeUiRequiredFilter extends OncePerRequestFilter {
             final @NonNull HttpServletRequest request,
             final @NonNull HttpServletResponse response,
             final @NonNull FilterChain filterChain) throws ServletException, IOException {
-        if (isIgnored(request)) {
-            //pass through even though 'change' is required request
-            filterChain.doFilter(request, response);
-        } else if (isCompleted(request)) {
+        if (isCompleted(request)) {
             logger.debug("Forced password change has been completed.");
             SavedRequest savedRequest = cache.getRequest(request, response);
             if (savedRequest != null) {
@@ -63,10 +57,6 @@ public class PasswordChangeUiRequiredFilter extends OncePerRequestFilter {
         }
     }
 
-    protected boolean isIgnored(HttpServletRequest request) {
-        return ignorePath.matches(request);
-    }
-
     private boolean isAuthenticated() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         return authentication != null && authentication.isAuthenticated();
@@ -74,8 +64,7 @@ public class PasswordChangeUiRequiredFilter extends OncePerRequestFilter {
 
     private boolean isCompleted(HttpServletRequest request) {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication instanceof UaaAuthentication) {
-            UaaAuthentication uaa = (UaaAuthentication) authentication;
+        if (authentication instanceof UaaAuthentication uaa) {
             return uaa.isAuthenticated() && !SessionUtils.isPasswordChangeRequired(request.getSession()) && completedPath.matches(request);
         }
         return false;
